@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Y7 OS — AI for Everyone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Tajawal:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080c10;
+    --surface:  #0d1117;
+    --border:   #1e2d3d;
+    --accent:   #00d4ff;
+    --accent2:  #00ff88;
+    --warn:     #ffb800;
+    --text:     #c9d1d9;
+    --muted:    #556070;
+    --mono:     'JetBrains Mono', monospace;
+    --arabic:   'Tajawal', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  /* ── Grid background ─────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Glow orbs ───────────────────────────────── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.07;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; left: -100px; animation: drift 20s ease-in-out infinite; }
+  .orb-2 { width: 400px; height: 400px; background: var(--accent2); bottom: 100px; right: -100px; animation: drift 25s ease-in-out infinite reverse; }
+
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(40px, 30px); }
+  }
+
+  /* ── Scanline overlay ────────────────────────── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ── Layout ──────────────────────────────────── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── Nav ─────────────────────────────────────── */
+  nav {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(8,12,16,0.9);
+    backdrop-filter: blur(12px);
+    z-index: 50;
+  }
+  nav .inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--text); font-weight: 300; }
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--accent); }
+  .nav-badge {
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Hero ────────────────────────────────────── */
+  .hero {
+    padding: 100px 0 80px;
+    text-align: center;
+  }
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.2);
+    color: var(--accent2);
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    margin-bottom: 40px;
+    animation: fadeIn 0.6s ease forwards;
+  }
+  .hero-tag::before { content: '●'; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .hero h1 {
+    font-size: clamp(3.5rem, 8vw, 7rem);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    color: #fff;
+    margin-bottom: 8px;
+    animation: slideUp 0.8s ease forwards;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero h1 .accent2 { color: var(--accent2); }
+
+  .hero-arabic {
+    font-family: var(--arabic);
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    color: var(--muted);
+    font-weight: 300;
+    margin-bottom: 32px;
+    direction: rtl;
+    animation: slideUp 0.9s ease forwards;
+  }
+
+  .hero-sub {
+    font-size: 1rem;
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto 48px;
+    line-height: 1.7;
+    animation: slideUp 1s ease forwards;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* ── Install box ─────────────────────────────── */
+  .install-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin-bottom: 20px;
+    animation: slideUp 1.1s ease forwards;
+    position: relative;
+    overflow: hidden;
+  }
+  .install-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .install-box .prompt { color: var(--accent2); user-select: none; }
+  .install-box code {
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: var(--mono);
+  }
+  .copy-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .hero-note {
+    font-size: 0.72rem;
+    color: var(--muted);
+    animation: fadeIn 1.4s ease forwards;
+  }
+  .hero-note a { color: var(--accent); text-decoration: none; }
+
+  /* ── Badges ──────────────────────────────────── */
+  .badges {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 40px;
+    animation: fadeIn 1.3s ease forwards;
+  }
+  .badge {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
+
+  /* ── Section ─────────────────────────────────── */
+  section { padding: 80px 0; border-top: 1px solid var(--border); }
+
+  .section-label {
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  .section-title {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+  .section-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    max-width: 500px;
+  }
+
+  /* ── Features grid ───────────────────────────── */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 48px;
+  }
+  .feature {
+    background: var(--surface);
+    padding: 32px;
+    transition: background 0.2s;
+  }
+  .feature:hover { background: rgba(0,212,255,0.03); }
+  .feature-icon { font-size: 1.5rem; margin-bottom: 16px; }
+  .feature-title { font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  .feature-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── Hardware table ──────────────────────────── */
+  .hw-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 40px;
+    font-size: 0.82rem;
+  }
+  .hw-table th {
+    text-align: left;
+    padding: 12px 20px;
+    background: rgba(0,212,255,0.05);
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .hw-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(30,45,61,0.5);
+    color: var(--text);
+  }
+  .hw-table tr:hover td { background: rgba(0,212,255,0.03); }
+  .hw-table .ok { color: var(--accent2); }
+  .hw-table .model { color: var(--accent); font-size: 0.78rem; }
+
+  /* ── Terminal demo ───────────────────────────── */
+  .terminal {
+    background: #0a0e14;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 40px;
+    font-size: 0.82rem;
+  }
+  .terminal-bar {
+    background: #111820;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal-bar span { color: var(--muted); font-size: 0.72rem; margin-left: 8px; }
+  .terminal-body { padding: 24px 28px; }
+  .tline { margin-bottom: 4px; line-height: 1.6; }
+  .t-prompt { color: var(--accent2); }
+  .t-cmd { color: var(--text); }
+  .t-out { color: var(--muted); }
+  .t-ok { color: var(--accent2); }
+  .t-info { color: var(--accent); }
+  .t-blank { margin-bottom: 12px; }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: var(--accent); animation: blink 1s infinite; vertical-align: middle; }
+
+  /* ── Architecture ────────────────────────────── */
+  .arch-layers {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 40px;
+  }
+  .arch-layer {
+    background: var(--surface);
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    transition: background 0.2s;
+  }
+  .arch-layer:hover { background: rgba(0,212,255,0.03); }
+  .arch-num {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    min-width: 60px;
+  }
+  .arch-name { font-weight: 600; color: #fff; min-width: 160px; font-size: 0.85rem; }
+  .arch-items { display: flex; gap: 10px; flex-wrap: wrap; }
+  .arch-pill {
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 0.72rem;
+  }
+  .arch-pill.green {
+    background: rgba(0,255,136,0.08);
+    border-color: rgba(0,255,136,0.2);
+    color: var(--accent2);
+  }
+  .arch-pill.warn {
+    background: rgba(255,184,0,0.08);
+    border-color: rgba(255,184,0,0.2);
+    color: var(--warn);
+  }
+
+  /* ── Roadmap ─────────────────────────────────── */
+  .roadmap { margin-top: 40px; display: flex; flex-direction: column; gap: 2px; }
+  .rm-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+  .rm-version { color: var(--accent); min-width: 48px; font-weight: 600; }
+  .rm-goal { color: var(--text); flex: 1; }
+  .rm-status { font-size: 0.7rem; padding: 3px 10px; border-radius: 3px; }
+  .rm-status.active { background: rgba(0,255,136,0.1); color: var(--accent2); border: 1px solid rgba(0,255,136,0.2); }
+  .rm-status.planned { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── CTA ─────────────────────────────────────── */
+  .cta {
+    text-align: center;
+    padding: 100px 0;
+  }
+  .cta h2 { font-size: clamp(2rem,5vw,3.5rem); font-weight: 700; color: #fff; letter-spacing: -0.03em; margin-bottom: 16px; }
+  .cta-arabic { font-family: var(--arabic); font-size: 1.2rem; color: var(--muted); direction: rtl; margin-bottom: 40px; }
+  .cta-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    padding: 14px 32px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 700;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+  .btn-primary:hover { background: #fff; transform: translateY(-1px); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    padding: 14px 32px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 400;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Footer ──────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  footer a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
+  footer a:hover { color: var(--accent); }
+  footer .sep { margin: 0 12px; }
+
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .install-box { flex-direction: column; text-align: center; }
+    .arch-layer { flex-direction: column; align-items: flex-start; }
+    .rm-item { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="inner">
+    <div class="logo">Y7<span> OS</span></div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#hardware">Hardware</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="https://github.com/yahyasaqban-lab/y7os" target="_blank">GitHub</a>
+      <span class="nav-badge">v0.1 — PLANNING</span>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="container">
+  <div class="hero">
+    <div class="hero-tag">OPEN SOURCE · MIT LICENSE · PRIVACY FIRST</div>
+    <h1><span class="accent">AI</span> for<br/><span class="accent2">Everyone</span></h1>
+    <p class="hero-arabic">الذكاء الاصطناعي للجميع — بدون سحابة، بدون اشتراك</p>
+    <p class="hero-sub">
+      A Linux distro built from scratch for local AI on low-resource hardware.
+      Old laptops. Raspberry Pi. VPS servers. 4GB RAM. Works offline.
+    </p>
+
+    <div class="install-box">
+      <span class="prompt">$</span>
+      <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | bash</code>
+      <button class="copy-btn" onclick="copyInstall()">COPY</button>
+    </div>
+    <p class="hero-note">⚠️ Install script coming in v0.1 — <a href="https://github.com/yahyasaqban-lab/y7os" target="_blank">star the repo</a> to follow progress</p>
+
+    <div class="badges">
+      <div class="badge"><div class="dot"></div> No GPU Required</div>
+      <div class="badge"><div class="dot"></div> 4GB RAM Minimum</div>
+      <div class="badge"><div class="dot" style="background:var(--warn)"></div> Arabic + English</div>
+      <div class="badge"><div class="dot" style="background:#fff"></div> Zero Telemetry</div>
+      <div class="badge"><div class="dot" style="background:var(--accent)"></div> LFS Based</div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="section-label">// features</div>
+    <h2 class="section-title">Built different.<br/>By design.</h2>
+    <p class="section-sub">Every decision in Y7 OS is made with one constraint: it must work on the hardware people actually have.</p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🧠</div>
+        <div class="feature-title">Local AI by Default</div>
+        <div class="feature-desc">Ollama + llama.cpp + Open WebUI pre-configured. Start chatting with an AI within minutes of install. No account needed.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">Adaptive Backend</div>
+        <div class="feature-desc">y7-ai auto-selects the right inference engine based on your free RAM. 12GB? Ollama full power. 3GB? llama.cpp minimal mode.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌐</div>
+        <div class="feature-title">Arabic First</div>
+        <div class="feature-desc">Full RTL support. Native Arabic locale. Bilingual interface. Qwen2 and Llama 3.1 recommended for Arabic tasks.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">Zero Telemetry</div>
+        <div class="feature-desc">Your conversations stay on your device. No analytics, no cloud sync, no data leaving your machine. Ever.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📦</div>
+        <div class="feature-title">One Command Install</div>
+        <div class="feature-desc">Detects your hardware, picks the right model, configures ZRAM, and launches Open WebUI. No configuration required.</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🛠️</div>
+        <div class="feature-title">Developer Ready</div>
+        <div class="feature-desc">Python 3.11, Git, Docker, Node.js pre-installed. The /ai/ directory is your workspace. Start building immediately.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL DEMO -->
+<section>
+  <div class="container">
+    <div class="section-label">// demo</div>
+    <h2 class="section-title">See it in action.</h2>
+    <p class="section-sub">This is what installing Y7 OS looks like on a machine with 6GB RAM.</p>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot" style="background:#ff5f57"></div>
+        <div class="terminal-dot" style="background:#febc2e"></div>
+        <div class="terminal-dot" style="background:#28c840"></div>
+        <span>y7-install</span>
+      </div>
+      <div class="terminal-body">
+        <div class="tline"><span class="t-prompt">$</span> <span class="t-cmd">curl -fsSL https://y7os.dev/install.sh | bash</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline" style="color:#00d4ff;font-weight:600">  ██╗   ██╗███████╗     ██████╗ ███████╗</div>
+        <div class="tline" style="color:#00d4ff">  ╚██╗ ██╔╝╚════██║    ██╔═══██╗██╔════╝</div>
+        <div class="tline" style="color:#00d4ff">   ╚████╔╝     ██╔╝    ██║   ██║███████╗</div>
+        <div class="tline" style="color:#556070">   The AI-first Linux distro</div>
+        <div class="tline t-blank"></div>
+        <div class="tline"><span class="t-info">  ▶ Detecting hardware...</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">CPU: Intel Core i5-8250U (8 cores)</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">RAM: 6144MB total, 4200MB free</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">AVX2: Supported (optimized inference)</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">Recommended model: mistral:7b-q4_k_m</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline"><span class="t-info">  ▶ Configuring ZRAM...</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">ZRAM: 3GB compressed swap (lz4)</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline"><span class="t-info">  ▶ Installing Ollama...</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">Ollama installed and running</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline"><span class="t-info">  ▶ Downloading mistral:7b-q4_k_m (4.1GB)...</span></div>
+        <div class="tline"><span class="t-ok">  ✅</span>  <span class="t-out">Model ready</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline" style="color:#00ff88;font-weight:600">  🎉 Y7 OS is ready!</div>
+        <div class="tline"><span class="t-out">  Open WebUI → </span><span style="color:#00d4ff">http://localhost:8080</span></div>
+        <div class="tline"><span class="t-out">  Start chat  → </span><span style="color:#00d4ff">y7-ai</span></div>
+        <div class="tline t-blank"></div>
+        <div class="tline"><span class="t-prompt">$</span> <span class="cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HARDWARE -->
+<section id="hardware">
+  <div class="container">
+    <div class="section-label">// hardware support</div>
+    <h2 class="section-title">Runs on the<br/>hardware you have.</h2>
+    <p class="section-sub">No GPU. No upgrade required. Just the laptop gathering dust or the Pi on your desk.</p>
+
+    <table class="hw-table">
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>Min RAM</th>
+          <th>Recommended Model</th>
+          <th>Backend</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Raspberry Pi 4/5</td><td>4 GB</td><td class="model">Phi-3 Mini</td><td>llama.cpp</td><td class="ok">✅ Supported</td></tr>
+        <tr><td>Old Laptop — Intel (4th–8th gen)</td><td>4 GB</td><td class="model">Mistral 7B Q4</td><td>llama.cpp / Ollama</td><td class="ok">✅ Supported</td></tr>
+        <tr><td>Old Laptop — AMD</td><td>8 GB</td><td class="model">Llama 3.1 8B Q4</td><td>Ollama</td><td class="ok">✅ Supported</td></tr>
+        <tr><td>VPS (2–4 vCPU)</td><td>4 GB</td><td class="model">Phi-3 / TinyLlama</td><td>llama.cpp headless</td><td class="ok">✅ Supported</td></tr>
+        <tr><td>ARM SBC (Orange Pi, Rock Pi)</td><td>2 GB</td><td class="model">TinyLlama / Qwen2 0.5B</td><td>llama.cpp minimal</td><td style="color:var(--warn)">⚠️ Experimental</td></tr>
+        <tr><td>Modern Laptop (16GB+)</td><td>16 GB</td><td class="model">Llama 3.1 70B Q4</td><td>Ollama</td><td class="ok">✅ Supported</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-label">// architecture</div>
+    <h2 class="section-title">Four layers.<br/>Zero bloat.</h2>
+    <p class="section-sub">Built from scratch with Linux From Scratch. Every binary is intentional.</p>
+
+    <div class="arch-layers">
+      <div class="arch-layer">
+        <div class="arch-num">LAYER 4</div>
+        <div class="arch-name">Y7 Shell</div>
+        <div class="arch-items">
+          <span class="arch-pill green">y7-install</span>
+          <span class="arch-pill green">y7-models</span>
+          <span class="arch-pill green">y7-ai</span>
+          <span class="arch-pill green">y7-status</span>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-num">LAYER 3</div>
+        <div class="arch-name">AI Stack</div>
+        <div class="arch-items">
+          <span class="arch-pill">Ollama</span>
+          <span class="arch-pill">llama.cpp</span>
+          <span class="arch-pill">Open WebUI</span>
+          <span class="arch-pill">Jan.ai</span>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-num">LAYER 2</div>
+        <div class="arch-name">Runtime</div>
+        <div class="arch-items">
+          <span class="arch-pill warn">Python 3.11</span>
+          <span class="arch-pill warn">Docker</span>
+          <span class="arch-pill warn">Git</span>
+          <span class="arch-pill warn">Node.js</span>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-num">LAYER 1</div>
+        <div class="arch-name">Base (LFS)</div>
+        <div class="arch-items">
+          <span class="arch-pill" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:#fff">LFS Kernel 6.6</span>
+          <span class="arch-pill" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:#fff">musl libc</span>
+          <span class="arch-pill" style="background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:#fff">BusyBox</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="container">
+    <div class="section-label">// roadmap</div>
+    <h2 class="section-title">Where we're going.</h2>
+
+    <div class="roadmap">
+      <div class="rm-item">
+        <span class="rm-version">v0.1</span>
+        <span class="rm-goal">y7-install script — works on Ubuntu & Debian</span>
+        <span class="rm-status active">IN PROGRESS</span>
+      </div>
+      <div class="rm-item">
+        <span class="rm-version">v0.2</span>
+        <span class="rm-goal">Full AI stack auto-configured + Open WebUI</span>
+        <span class="rm-status planned">PLANNED</span>
+      </div>
+      <div class="rm-item">
+        <span class="rm-version">v0.5</span>
+        <span class="rm-goal">y7-models CLI + y7-status + Arabic support</span>
+        <span class="rm-status planned">PLANNED</span>
+      </div>
+      <div class="rm-item">
+        <span class="rm-version">v0.8</span>
+        <span class="rm-goal">Custom LFS kernel + minimal base image</span>
+        <span class="rm-status planned">PLANNED</span>
+      </div>
+      <div class="rm-item">
+        <span class="rm-version">v0.9</span>
+        <span class="rm-goal">Bootable ISO — tested on 5+ hardware targets</span>
+        <span class="rm-status planned">PLANNED</span>
+      </div>
+      <div class="rm-item" style="border-color:rgba(0,212,255,0.3)">
+        <span class="rm-version" style="color:var(--accent2)">v1.0</span>
+        <span class="rm-goal" style="color:#fff;font-weight:600">Public release — full docs — community launch</span>
+        <span class="rm-status planned">PLANNED</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="container">
+    <h2>Start building today.</h2>
+    <p class="cta-arabic">ابدأ البناء اليوم — الكود مفتوح للجميع</p>
+    <div class="cta-btns">
+      <a href="https://github.com/yahyasaqban-lab/y7os" class="btn-primary" target="_blank">⭐  Star on GitHub</a>
+      <a href="https://github.com/yahyasaqban-lab/y7os/issues" class="btn-secondary" target="_blank">Report an Issue</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p>
+      Y7 OS — Built by <a href="https://github.com/yahyasaqban-lab" target="_blank">Yahya</a>
+      <span class="sep">•</span>
+      <a href="https://github.com/yahyasaqban-lab/y7os" target="_blank">GitHub</a>
+      <span class="sep">•</span>
+      <a href="https://github.com/yahyasaqban-lab/y7os/blob/main/LICENSE" target="_blank">MIT License</a>
+      <span class="sep">•</span>
+      For everyone. Forever open.
+    </p>
+    <p style="margin-top:8px;font-family:var(--arabic);direction:rtl">
+      للجميع — مفتوح للأبد — بُني في الكويت 🇰🇼
+    </p>
+  </div>
+</footer>
+
+<script>
+function copyInstall() {
+  const cmd = document.getElementById('install-cmd').textContent;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'COPIED!';
+    btn.style.color = 'var(--accent2)';
+    btn.style.borderColor = 'var(--accent2)';
+    setTimeout(() => {
+      btn.textContent = 'COPY';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+
+// Animate elements on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.style.opacity = '1';
+      e.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.feature, .rm-item, .arch-layer').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(16px)';
+  el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
