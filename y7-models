@@ -1,0 +1,313 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-models — Y7 OS Model Manager
+#  Manage local AI models: download, switch, delete, recommend
+#  github.com/yahyasaqban-lab/y7os
+# ─────────────────────────────────────────────────────────────
+
+set -e
+
+# ── Colors ────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+
+# ── Model Registry ────────────────────────────────────────────
+# Format: "short_name|ollama_tag|size_gb|min_ram_gb|arabic|description"
+MODEL_REGISTRY=(
+  "tinyllama|tinyllama|0.6|1|no|Ultra-light. Best for <2GB RAM devices."
+  "gemma2b|gemma:2b|1.5|3|no|Fast and efficient. Good for summaries."
+  "phi3|phi3:mini|2.3|4|partial|Best quality/size ratio. Great all-rounder."
+  "phi3m|phi3:medium|8.0|10|partial|Larger Phi-3. Better reasoning."
+  "mistral|mistral:7b-q4_k_m|4.1|6|partial|Excellent general-purpose model."
+  "llama3|llama3.1:8b-q4_K_M|4.7|6|good|Best all-rounder with Arabic support."
+  "qwen2|qwen2:7b-q4_K_M|4.4|6|best|Best Arabic language model in class."
+  "qwen2b|qwen2:1.5b|1.0|3|good|Small Qwen2. Arabic on low-RAM devices."
+  "llama370b|llama3.1:70b-q4_K_M|40.0|48|best|High-end only. Best quality overall."
+  "codellama|codellama:7b-q4_K_M|3.8|6|no|Specialized for code generation."
+  "deepseek|deepseek-coder:6.7b|3.8|6|no|Excellent code assistant."
+)
+
+# ── Helpers ───────────────────────────────────────────────────
+log_ok()   { echo -e "  ${GREEN}✅${NC}  $1"; }
+log_info() { echo -e "  ${CYAN}ℹ️ ${NC}  $1"; }
+log_warn() { echo -e "  ${YELLOW}⚠️ ${NC}  $1"; }
+log_err()  { echo -e "  ${RED}❌${NC}  $1"; exit 1; }
+
+get_free_ram_gb() { echo $(( $(free -m | awk '/^Mem:/{print $7}') / 1024 )); }
+get_total_ram_gb() { echo $(( $(free -m | awk '/^Mem:/{print $2}') / 1024 )); }
+get_free_disk_gb() { df -BG /ai/models 2>/dev/null | awk 'NR==2{print $4}' | tr -d 'G' || df -BG / | awk 'NR==2{print $4}' | tr -d 'G'; }
+
+check_ollama() {
+  if ! command -v ollama &>/dev/null; then
+    log_err "Ollama not installed. Run: curl -fsSL https://ollama.ai/install.sh | sh"
+  fi
+}
+
+ollama_tag_for() {
+  local short="$1"
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    if [ "$sname" = "$short" ]; then echo "$tag"; return; fi
+  done
+  # Not in registry — use as-is (direct ollama tag)
+  echo "$short"
+}
+
+arabic_badge() {
+  case "$1" in
+    best)    echo "🌐🌐🌐 Best"   ;;
+    good)    echo "🌐🌐   Good"   ;;
+    partial) echo "🌐     Partial" ;;
+    *)       echo "—      None"   ;;
+  esac
+}
+
+# ── Commands ──────────────────────────────────────────────────
+
+cmd_list() {
+  check_ollama
+  echo ""
+  echo -e "${BOLD}  Downloaded models:${NC}"
+  echo ""
+  if ollama list 2>/dev/null | grep -v "^NAME" | grep -q .; then
+    ollama list | while IFS= read -r line; do
+      echo "  $line"
+    done
+  else
+    log_info "No models downloaded yet."
+    echo "  Run: ${CYAN}y7-models download phi3${NC} to get started."
+  fi
+  echo ""
+}
+
+cmd_available() {
+  local free_ram=$(get_free_ram_gb)
+  echo ""
+  echo -e "${BOLD}  Available models (registry):${NC}"
+  echo ""
+  printf "  ${BOLD}%-12s %-28s %-8s %-8s %-16s %s${NC}\n" "Short Name" "Ollama Tag" "Size" "Min RAM" "Arabic" "Description"
+  printf "  %s\n" "────────────────────────────────────────────────────────────────────────────────────────"
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    # Highlight if fits in current RAM
+    if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || echo 0) )); then
+      color="${GREEN}"
+    else
+      color="${YELLOW}"
+    fi
+    printf "  ${color}%-12s %-28s %-8s %-8s %-16s %s${NC}\n" "$sname" "$tag" "${size}GB" "${min_ram}GB" "$(arabic_badge $arabic)" "$desc"
+  done
+  echo ""
+  echo -e "  ${GREEN}Green${NC} = fits your current free RAM (${free_ram}GB)  ${YELLOW}Yellow${NC} = needs more RAM"
+  echo ""
+}
+
+cmd_download() {
+  check_ollama
+  local input="$1"
+  [ -z "$input" ] && { echo "Usage: y7-models download <model>"; echo "Run: y7-models available — to see all models"; exit 1; }
+
+  local tag=$(ollama_tag_for "$input")
+  echo ""
+  log_info "Downloading: ${BOLD}$tag${NC}"
+
+  # Check disk space
+  local free_disk=$(get_free_disk_gb)
+  log_info "Free disk: ${free_disk}GB"
+  if [ "$free_disk" -lt 3 ]; then
+    log_warn "Less than 3GB free. Download may fail."
+  fi
+
+  # Start ollama if not running
+  ollama serve &>/dev/null & sleep 2
+
+  if ollama pull "$tag"; then
+    log_ok "Downloaded: $tag"
+    log_info "Run it: ${CYAN}y7-ai $input${NC}"
+  else
+    log_err "Download failed. Check your internet connection."
+  fi
+  echo ""
+}
+
+cmd_switch() {
+  check_ollama
+  local input="$1"
+  [ -z "$input" ] && { echo "Usage: y7-models switch <model>"; exit 1; }
+  local tag=$(ollama_tag_for "$input")
+  echo ""
+  log_info "Switching to: ${BOLD}$tag${NC}"
+  ollama serve &>/dev/null & sleep 2
+  ollama run "$tag"
+}
+
+cmd_delete() {
+  check_ollama
+  local input="$1"
+  [ -z "$input" ] && { echo "Usage: y7-models delete <model>"; exit 1; }
+  local tag=$(ollama_tag_for "$input")
+  echo ""
+  echo -e "  ${RED}Delete model: $tag?${NC} This frees disk space but you'll need to re-download."
+  read -p "  Confirm (y/N): " confirm
+  if [[ "$confirm" =~ ^[Yy]$ ]]; then
+    ollama rm "$tag" && log_ok "Deleted: $tag" || log_warn "Could not delete $tag"
+  else
+    log_info "Cancelled."
+  fi
+  echo ""
+}
+
+cmd_info() {
+  local input="$1"
+  [ -z "$input" ] && { echo "Usage: y7-models info <model>"; exit 1; }
+  echo ""
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    if [ "$sname" = "$input" ] || [ "$tag" = "$input" ]; then
+      echo -e "  ${BOLD}${BLUE}Model: $tag${NC}"
+      echo ""
+      echo -e "  Short name:   $sname"
+      echo -e "  Ollama tag:   $tag"
+      echo -e "  Size (Q4):    ${size}GB"
+      echo -e "  Min RAM:      ${min_ram}GB"
+      echo -e "  Arabic:       $(arabic_badge $arabic)"
+      echo -e "  Description:  $desc"
+      echo ""
+      local free_ram=$(get_free_ram_gb)
+      if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || echo 0) )); then
+        log_ok "This model fits your current free RAM (${free_ram}GB)"
+      else
+        log_warn "Your free RAM (${free_ram}GB) is below minimum (${min_ram}GB)"
+        log_info "Consider using ZRAM or a smaller model"
+      fi
+      echo ""
+      return
+    fi
+  done
+  log_warn "Model '$input' not in Y7 OS registry. Try: y7-models available"
+  echo ""
+}
+
+cmd_recommend() {
+  local free_ram=$(get_free_ram_gb)
+  local total_ram=$(get_total_ram_gb)
+  local free_disk=$(get_free_disk_gb)
+  local arch=$(uname -m)
+  local avx2="No"
+  grep -q avx2 /proc/cpuinfo && avx2="Yes"
+
+  echo ""
+  echo -e "${BOLD}  📊 Your System${NC}"
+  echo "  ─────────────────────────────────────"
+  echo -e "  Free RAM:    ${CYAN}${free_ram}GB${NC} (of ${total_ram}GB total)"
+  echo -e "  Free Disk:   ${CYAN}${free_disk}GB${NC}"
+  echo -e "  Architecture: $arch"
+  echo -e "  AVX2:         $avx2"
+  echo ""
+  echo -e "${BOLD}  🏆 Recommendations${NC}"
+  echo "  ─────────────────────────────────────"
+
+  local count=0
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || [ "$free_ram" -ge "$min_ram" ] && echo 1 || echo 0) )); then
+      count=$((count + 1))
+      if [ $count -eq 1 ]; then
+        echo -e "  ${GREEN}${BOLD}1. $tag${NC} — ${desc}"
+        echo -e "     Size: ${size}GB  •  Arabic: $(arabic_badge $arabic)"
+        echo -e "     ${CYAN}y7-models download $sname${NC}"
+      elif [ $count -le 3 ]; then
+        echo ""
+        echo -e "  ${CYAN}$count. $tag${NC} — ${desc}"
+        echo -e "     Size: ${size}GB  •  Arabic: $(arabic_badge $arabic)"
+        echo -e "     ${CYAN}y7-models download $sname${NC}"
+      fi
+      [ $count -ge 3 ] && break
+    fi
+  done
+
+  if [ $count -eq 0 ]; then
+    echo -e "  ${YELLOW}Your free RAM is very low (${free_ram}GB).${NC}"
+    echo -e "  Consider: ${CYAN}y7-models download tinyllama${NC} (requires 1GB)"
+    echo -e "  Or enable ZRAM: ${CYAN}sudo /etc/y7/zram-setup.sh${NC}"
+  fi
+  echo ""
+}
+
+cmd_search() {
+  local query="$1"
+  [ -z "$query" ] && { echo "Usage: y7-models search <keyword>"; exit 1; }
+  echo ""
+  echo -e "  ${BOLD}Search results for: '$query'${NC}"
+  echo ""
+  local found=0
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    if echo "$sname $tag $desc $arabic" | grep -qi "$query"; then
+      echo -e "  ${CYAN}$sname${NC} → $tag"
+      echo -e "    $desc  (${size}GB, ${min_ram}GB RAM min)"
+      found=$((found + 1))
+    fi
+  done
+  [ $found -eq 0 ] && log_warn "No models found matching '$query'"
+  echo ""
+}
+
+cmd_update() {
+  check_ollama
+  echo ""
+  log_info "Checking for model updates..."
+  ollama list | grep -v "^NAME" | awk '{print $1}' | while read -r model; do
+    [ -z "$model" ] && continue
+    echo -e "  ${CYAN}Updating: $model${NC}"
+    ollama pull "$model" && log_ok "Updated: $model" || log_warn "Could not update: $model"
+  done
+  echo ""
+  log_ok "All models checked."
+  echo ""
+}
+
+# ── Help ──────────────────────────────────────────────────────
+cmd_help() {
+  echo ""
+  echo -e "${BOLD}  y7-models — Y7 OS Model Manager${NC}"
+  echo -e "  ${CYAN}github.com/yahyasaqban-lab/y7os${NC}"
+  echo ""
+  echo -e "  ${BOLD}Commands:${NC}"
+  echo ""
+  echo -e "  ${CYAN}y7-models list${NC}                 List downloaded models"
+  echo -e "  ${CYAN}y7-models available${NC}            Browse all models in registry"
+  echo -e "  ${CYAN}y7-models download <model>${NC}     Download a model"
+  echo -e "  ${CYAN}y7-models switch <model>${NC}       Switch to a model (starts chat)"
+  echo -e "  ${CYAN}y7-models delete <model>${NC}       Delete a model (frees disk)"
+  echo -e "  ${CYAN}y7-models info <model>${NC}         Show model details"
+  echo -e "  ${CYAN}y7-models recommend${NC}            Best model for your hardware"
+  echo -e "  ${CYAN}y7-models search <keyword>${NC}     Search models by name or feature"
+  echo -e "  ${CYAN}y7-models update${NC}               Update all downloaded models"
+  echo ""
+  echo -e "  ${BOLD}Short names (registry):${NC}"
+  echo ""
+  for entry in "${MODEL_REGISTRY[@]}"; do
+    IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
+    printf "  ${CYAN}%-12s${NC} → %-28s ${size}GB\n" "$sname" "$tag"
+  done
+  echo ""
+}
+
+# ── Router ────────────────────────────────────────────────────
+case "${1:-help}" in
+  list)       cmd_list ;;
+  available)  cmd_available ;;
+  download)   cmd_download "$2" ;;
+  switch)     cmd_switch "$2" ;;
+  delete|rm)  cmd_delete "$2" ;;
+  info)       cmd_info "$2" ;;
+  recommend)  cmd_recommend ;;
+  search)     cmd_search "$2" ;;
+  update)     cmd_update ;;
+  help|--help|-h) cmd_help ;;
+  *)
+    log_warn "Unknown command: $1"
+    cmd_help
+    ;;
+esac
