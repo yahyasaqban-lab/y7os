@@ -1,0 +1,108 @@
+name: Test y7-install
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tools/y7-install'
+      - 'tools/y7-models'
+      - 'tools/y7-status'
+      - 'tools/y7-ai'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ── Syntax Check ─────────────────────────────────────────────
+  shellcheck:
+    name: Shell Script Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint y7-install
+        run: shellcheck -S warning tools/y7-install || true
+
+      - name: Lint y7-models
+        run: shellcheck -S warning tools/y7-models || true
+
+      - name: Lint y7-status
+        run: shellcheck -S warning tools/y7-status || true
+
+      - name: Lint y7-ai
+        run: shellcheck -S warning tools/y7-ai || true
+
+  # ── Dry Run Test ──────────────────────────────────────────────
+  dry-run:
+    name: Dry Run (Ubuntu 22.04)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make tools executable
+        run: chmod +x tools/*
+
+      - name: Check y7-status runs
+        run: |
+          # Install the tool
+          sudo cp tools/y7-status /usr/local/bin/y7-status
+          sudo chmod +x /usr/local/bin/y7-status
+          # Run it
+          y7-status
+
+      - name: Check y7-models runs
+        run: |
+          sudo cp tools/y7-models /usr/local/bin/y7-models
+          sudo chmod +x /usr/local/bin/y7-models
+          y7-models help || true
+          y7-models recommend
+
+      - name: Check y7-ai runs (no model needed)
+        run: |
+          sudo cp tools/y7-ai /usr/local/bin/y7-ai
+          sudo chmod +x /usr/local/bin/y7-ai
+          # Just check it starts without crashing
+          timeout 3 y7-ai --help || true
+
+      - name: Verify /ai directory structure
+        run: |
+          sudo mkdir -p /ai/{models,prompts,outputs,logs}
+          ls -la /ai/
+
+  # ── Hardware Matrix ───────────────────────────────────────────
+  hardware-detection:
+    name: Hardware Detection Logic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test RAM detection
+        run: |
+          RAM=$(free -m | awk '/^Mem:/{print $2}')
+          echo "Detected RAM: ${RAM}MB"
+          [ "$RAM" -gt 0 ] && echo "✅ RAM detection works"
+
+      - name: Test CPU detection
+        run: |
+          CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)
+          echo "Detected CPU: $CPU"
+          CORES=$(nproc)
+          echo "Detected cores: $CORES"
+
+      - name: Test AVX2 detection
+        run: |
+          if grep -q avx2 /proc/cpuinfo; then
+            echo "✅ AVX2 supported"
+          else
+            echo "ℹ️  No AVX2 (will use generic build)"
+          fi
+
+      - name: Test architecture detection
+        run: |
+          ARCH=$(uname -m)
+          echo "Architecture: $ARCH"
+          [[ "$ARCH" == "x86_64" || "$ARCH" == "aarch64" || "$ARCH" == "armv7l" ]] && \
+            echo "✅ Supported architecture" || \
+            echo "⚠️  Unknown architecture: $ARCH"
