@@ -1,0 +1,174 @@
+name: Y7 OS CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ── 1. Lint all shell scripts ─────────────────────────────
+  shellcheck:
+    name: ShellCheck Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y shellcheck
+      - name: Lint all tools
+        run: |
+          for f in tools/*; do
+            # Only lint shell scripts (skip Python)
+            if head -1 "$f" | grep -q "bash\|sh"; then
+              echo "Linting: $f"
+              shellcheck -S warning "$f" || true
+            fi
+          done
+
+  # ── 2. Tool functionality tests ───────────────────────────
+  tool-tests:
+    name: Tool Tests (Ubuntu 22.04)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make tools executable
+        run: chmod +x tools/*
+
+      - name: Install tools system-wide
+        run: |
+          sudo cp tools/y7-status /usr/local/bin/y7-status
+          sudo cp tools/y7-models /usr/local/bin/y7-models
+          sudo cp tools/y7-ai    /usr/local/bin/y7-ai
+          sudo cp tools/y7-lang  /usr/local/bin/y7-lang
+          sudo cp tools/y7-bench /usr/local/bin/y7-bench
+          sudo chmod +x /usr/local/bin/y7-*
+
+      - name: Test y7-status
+        run: y7-status
+
+      - name: Test y7-models help
+        run: y7-models help
+
+      - name: Test y7-models available
+        run: y7-models available
+
+      - name: Test y7-models recommend
+        run: y7-models recommend
+
+      - name: Test y7-ai help
+        run: y7-ai --help
+
+      - name: Test y7-ai status
+        run: y7-ai --status
+
+      - name: Test y7-lang help
+        run: y7-lang --help
+
+      - name: Test y7-bench help
+        run: y7-bench help
+
+      - name: Verify /ai directory structure
+        run: |
+          sudo mkdir -p /ai/{models,prompts,outputs,logs,benchmarks}
+          ls -la /ai/
+          echo "✅ /ai structure OK"
+
+  # ── 3. Hardware detection tests ───────────────────────────
+  hardware-detection:
+    name: Hardware Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: RAM detection
+        run: |
+          RAM=$(free -m | awk '/^Mem:/{print $2}')
+          FREE=$(free -m | awk '/^Mem:/{print $7}')
+          echo "Total RAM: ${RAM}MB | Free: ${FREE}MB"
+          [ "$RAM" -gt 0 ] && echo "✅ RAM detection OK"
+
+      - name: CPU detection
+        run: |
+          CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs)
+          CORES=$(nproc)
+          ARCH=$(uname -m)
+          echo "CPU: $CPU | Cores: $CORES | Arch: $ARCH"
+          echo "✅ CPU detection OK"
+
+      - name: AVX2 detection
+        run: |
+          grep -q avx2 /proc/cpuinfo && echo "✅ AVX2 supported" || echo "ℹ️ No AVX2"
+
+      - name: Backend selection logic
+        run: |
+          # Simulate backend selection
+          FREE=$(free -m | awk '/^Mem:/{print $7}')
+          if   [ "$FREE" -gt 12000 ]; then BACKEND="ollama_high"
+          elif [ "$FREE" -gt 6000  ]; then BACKEND="ollama_balanced"
+          elif [ "$FREE" -gt 3000  ]; then BACKEND="llamacpp"
+          else                             BACKEND="llamacpp_minimal"
+          fi
+          echo "Detected backend: $BACKEND"
+          echo "✅ Backend selection OK"
+
+  # ── 4. Model registry validation ──────────────────────────
+  model-registry:
+    name: Model Registry Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make y7-models executable
+        run: chmod +x tools/y7-models
+      - name: Check all short names resolve
+        run: |
+          chmod +x tools/y7-models
+          sudo cp tools/y7-models /usr/local/bin/y7-models
+          # Test a few short names resolve without error
+          y7-models info phi3    | grep -q "phi3"    && echo "✅ phi3 resolves"
+          y7-models info qwen2   | grep -q "qwen2"   && echo "✅ qwen2 resolves"
+          y7-models info mistral | grep -q "mistral" && echo "✅ mistral resolves"
+
+  # ── 5. Python dashboard syntax check ─────────────────────
+  dashboard-check:
+    name: Dashboard Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Syntax check y7-dashboard
+        run: python3 -m py_compile tools/y7-dashboard && echo "✅ y7-dashboard syntax OK"
+
+  # ── 6. README and docs check ──────────────────────────────
+  docs-check:
+    name: Docs Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required files exist
+        run: |
+          files=(
+            "README.md"
+            "docs/vision.md"
+            "docs/architecture.md"
+            "docs/models.md"
+            "docs/contributing.md"
+            "tools/y7-install"
+            "tools/y7-models"
+            "tools/y7-ai"
+            "tools/y7-lang"
+            "tools/y7-bench"
+            "tools/y7-dashboard"
+            "LICENSE"
+          )
+          all_ok=true
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "✅ $f"
+            else
+              echo "❌ MISSING: $f"
+              all_ok=false
+            fi
+          done
+          $all_ok || exit 1

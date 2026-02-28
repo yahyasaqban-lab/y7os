@@ -1,0 +1,310 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-ai — Y7 OS Intelligent AI Launcher
+#  Auto-selects backend based on available RAM
+#  github.com/yahyasaqban-lab/y7os
+# ─────────────────────────────────────────────────────────────
+
+set -e
+
+# ── Colors ────────────────────────────────────────────────────
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+
+# ── Config ────────────────────────────────────────────────────
+Y7_MODELS_DIR="${Y7_MODELS_DIR:-/ai/models}"
+Y7_OLLAMA_HOST="${Y7_OLLAMA_HOST:-http://localhost:11434}"
+Y7_LOG="${Y7_LOG:-/ai/logs/y7-ai.log}"
+Y7_HISTORY="${Y7_HISTORY:-/ai/outputs/history.log}"
+
+# ── Helpers ───────────────────────────────────────────────────
+log()     { echo -e "${DIM}[Y7]${NC} $1"; }
+log_ok()  { echo -e "${GREEN}[Y7]${NC} $1"; }
+log_warn(){ echo -e "${YELLOW}[Y7]${NC} $1"; }
+ts()      { date '+%Y-%m-%d %H:%M:%S'; }
+
+get_free_ram_mb()  { free -m | awk '/^Mem:/{print $7}'; }
+get_total_ram_mb() { free -m | awk '/^Mem:/{print $2}'; }
+get_cpu_cores()    { nproc; }
+
+ollama_running() { curl -s "$Y7_OLLAMA_HOST" &>/dev/null; }
+
+# ── Backend selection logic ───────────────────────────────────
+select_backend() {
+  local ram=$1
+  if   [ "$ram" -gt 12000 ]; then echo "ollama_high"
+  elif [ "$ram" -gt 6000  ]; then echo "ollama_balanced"
+  elif [ "$ram" -gt 3000  ]; then echo "llamacpp"
+  else                            echo "llamacpp_minimal"
+  fi
+}
+
+backend_label() {
+  case "$1" in
+    ollama_high)     echo "Ollama — High Performance" ;;
+    ollama_balanced) echo "Ollama — Balanced" ;;
+    llamacpp)        echo "llama.cpp — Low Resource" ;;
+    llamacpp_minimal)echo "llama.cpp — Minimal" ;;
+  esac
+}
+
+# ── Resolve model name to ollama tag or gguf path ─────────────
+resolve_model() {
+  local input="$1"
+  local backend="$2"
+
+  # If ollama backend, resolve short name to tag
+  if [[ "$backend" == ollama* ]]; then
+    case "$input" in
+      phi3|phi3mini)   echo "phi3:mini" ;;
+      mistral)         echo "mistral:7b-q4_K_M" ;;
+      llama3|llama)    echo "llama3.1:8b-q4_K_M" ;;
+      qwen2|arabic)    echo "qwen2:7b-q4_K_M" ;;
+      gemma)           echo "gemma:2b" ;;
+      tiny|tinyllama)  echo "tinyllama" ;;
+      codellama|code)  echo "codellama:7b-q4_K_M" ;;
+      *)               echo "$input" ;;  # pass through as-is
+    esac
+    return
+  fi
+
+  # llama.cpp backend — find .gguf file
+  local gguf
+  # Try exact filename first
+  gguf=$(find "$Y7_MODELS_DIR" -name "*.gguf" 2>/dev/null | grep -i "$input" | head -1)
+  if [ -n "$gguf" ]; then echo "$gguf"; return; fi
+
+  # Fall back to first available gguf
+  gguf=$(find "$Y7_MODELS_DIR" -name "*.gguf" 2>/dev/null | head -1)
+  if [ -n "$gguf" ]; then
+    log_warn "Model '$input' not found as .gguf — using: $(basename $gguf)"
+    echo "$gguf"
+    return
+  fi
+
+  # No gguf found — try ollama as last resort
+  echo "phi3:mini"
+}
+
+# ── Start Ollama if not running ───────────────────────────────
+ensure_ollama() {
+  if ollama_running; then return 0; fi
+
+  log "Starting Ollama..."
+  ollama serve &>/dev/null &
+  local waited=0
+  while ! ollama_running; do
+    sleep 1; waited=$((waited+1))
+    [ "$waited" -gt 20 ] && { log_warn "Ollama took too long to start"; return 1; }
+  done
+  log_ok "Ollama ready"
+}
+
+# ── Print mode banner ─────────────────────────────────────────
+print_mode_banner() {
+  local backend="$1" model="$2" ram="$3"
+  echo ""
+  echo -e "${BLUE}${BOLD}  ┌─────────────────────────────────────┐${NC}"
+  echo -e "${BLUE}${BOLD}  │  🤖 Y7 OS — AI Launcher             │${NC}"
+  echo -e "${BLUE}${BOLD}  ├─────────────────────────────────────┤${NC}"
+  echo -e "${BLUE}${BOLD}  │${NC}  Mode:   ${GREEN}$(backend_label $backend)${NC}"
+  echo -e "${BLUE}${BOLD}  │${NC}  Model:  ${CYAN}$model${NC}"
+  echo -e "${BLUE}${BOLD}  │${NC}  RAM:    ${ram}MB free"
+  echo -e "${BLUE}${BOLD}  │${NC}  Cores:  $(get_cpu_cores)"
+  echo -e "${BLUE}${BOLD}  └─────────────────────────────────────┘${NC}"
+  echo ""
+  echo -e "  ${DIM}Type your message. 'exit' or Ctrl+C to quit.${NC}"
+  echo -e "  ${DIM}WebUI: http://localhost:8080${NC}"
+  echo ""
+}
+
+# ── Log session ───────────────────────────────────────────────
+log_session() {
+  local backend="$1" model="$2"
+  mkdir -p "$(dirname "$Y7_LOG")" 2>/dev/null || true
+  echo "$(ts) | backend=$backend | model=$model | ram=$(get_free_ram_mb)MB" >> "$Y7_LOG" 2>/dev/null || true
+}
+
+# ── Run via Ollama ────────────────────────────────────────────
+run_ollama() {
+  local model="$1" mode="$2"
+
+  ensure_ollama || { log_warn "Ollama unavailable — falling back to llama.cpp"; run_llamacpp "$model" "llamacpp"; return; }
+
+  # Apply mode-specific env vars
+  case "$mode" in
+    ollama_balanced)
+      export OLLAMA_MAX_LOADED_MODELS=1
+      export OLLAMA_KEEP_ALIVE=5m
+      ;;
+    ollama_high)
+      export OLLAMA_MAX_LOADED_MODELS=2
+      export OLLAMA_KEEP_ALIVE=15m
+      ;;
+  esac
+
+  # Check model is downloaded
+  if ! ollama list 2>/dev/null | grep -q "$(echo $model | cut -d: -f1)"; then
+    log_warn "Model '$model' not downloaded"
+    log "Downloading now..."
+    ollama pull "$model" || { log_warn "Download failed — try: ollama pull $model"; exit 1; }
+  fi
+
+  log_session "$mode" "$model"
+  print_mode_banner "$mode" "$model" "$(get_free_ram_mb)"
+  ollama run "$model"
+}
+
+# ── Run via llama.cpp ─────────────────────────────────────────
+run_llamacpp() {
+  local model_input="$1" mode="$2"
+  local gguf=$(resolve_model "$model_input" "llamacpp")
+  local threads=$(get_cpu_cores)
+  local ctx=2048
+  local batch=512
+
+  # Adjust params for minimal mode
+  if [ "$mode" = "llamacpp_minimal" ]; then
+    ctx=512; batch=128; threads=2
+    log_warn "Minimal mode: reduced context (512 tokens) and threads (2)"
+  fi
+
+  # Try llama.cpp binary locations
+  local llama_bin=""
+  for loc in /opt/llama.cpp/llama-cli /opt/llama.cpp/main /usr/local/bin/llama-cli; do
+    [ -f "$loc" ] && { llama_bin="$loc"; break; }
+  done
+
+  if [ -z "$llama_bin" ]; then
+    log_warn "llama.cpp not found — falling back to Ollama"
+    ensure_ollama && ollama run "phi3:mini" || exit 1
+    return
+  fi
+
+  if [ ! -f "$gguf" ]; then
+    log_warn "No .gguf model found in $Y7_MODELS_DIR"
+    log "Falling back to Ollama..."
+    ensure_ollama && ollama run "phi3:mini"
+    return
+  fi
+
+  log_session "$mode" "$(basename $gguf)"
+  print_mode_banner "$mode" "$(basename $gguf)" "$(get_free_ram_mb)"
+
+  "$llama_bin" \
+    -m "$gguf" \
+    -c "$ctx" \
+    -t "$threads" \
+    -b "$batch" \
+    --temp 0.7 \
+    --repeat-penalty 1.1 \
+    -i -ins 2>/dev/null
+}
+
+# ── Non-interactive mode (single prompt) ─────────────────────
+run_prompt() {
+  local model="$1" prompt="$2" backend="$3"
+
+  mkdir -p "$(dirname "$Y7_HISTORY")" 2>/dev/null || true
+
+  log "Prompt mode: $model"
+  echo "$(ts) | $model | $prompt" >> "$Y7_HISTORY" 2>/dev/null || true
+
+  if [[ "$backend" == ollama* ]]; then
+    ensure_ollama
+    ollama run "$model" "$prompt"
+  else
+    local gguf=$(resolve_model "$model" "llamacpp")
+    local llama_bin=""
+    for loc in /opt/llama.cpp/llama-cli /opt/llama.cpp/main; do
+      [ -f "$loc" ] && { llama_bin="$loc"; break; }
+    done
+    [ -n "$llama_bin" ] && [ -f "$gguf" ] && \
+      "$llama_bin" -m "$gguf" -p "$prompt" -n 512 -t "$(get_cpu_cores)" --temp 0.7 2>/dev/null || \
+      { ensure_ollama; ollama run "$model" "$prompt"; }
+  fi
+}
+
+# ── Help ──────────────────────────────────────────────────────
+show_help() {
+  echo ""
+  echo -e "${BOLD}  y7-ai — Y7 OS Intelligent AI Launcher${NC}"
+  echo ""
+  echo -e "  ${CYAN}y7-ai${NC}                     Start AI chat (auto model)"
+  echo -e "  ${CYAN}y7-ai phi3${NC}                Chat with Phi-3 Mini"
+  echo -e "  ${CYAN}y7-ai arabic${NC}              Chat with best Arabic model (Qwen2)"
+  echo -e "  ${CYAN}y7-ai mistral${NC}             Chat with Mistral 7B"
+  echo -e "  ${CYAN}y7-ai code${NC}                Chat with CodeLlama"
+  echo -e "  ${CYAN}y7-ai phi3 -p 'Hello'${NC}     Single prompt, no interactive mode"
+  echo -e "  ${CYAN}y7-ai --status${NC}            Show backend + RAM info"
+  echo -e "  ${CYAN}y7-ai --help${NC}              Show this help"
+  echo ""
+  echo -e "  ${BOLD}Short names:${NC}"
+  echo -e "  phi3, mistral, llama3, qwen2, arabic, gemma, tiny, code"
+  echo ""
+  echo -e "  ${DIM}Backend is auto-selected based on free RAM.${NC}"
+  echo -e "  ${DIM}Override: Y7_BACKEND=ollama y7-ai${NC}"
+  echo ""
+}
+
+show_status() {
+  local ram=$(get_free_ram_mb)
+  local backend=$(select_backend "$ram")
+  echo ""
+  echo -e "${BOLD}  Y7 AI Status${NC}"
+  echo "  ─────────────────────────────"
+  echo -e "  Free RAM:   ${CYAN}${ram}MB${NC}"
+  echo -e "  Backend:    ${GREEN}$(backend_label $backend)${NC}"
+  echo -e "  Ollama:     $(ollama_running && echo "${GREEN}running${NC}" || echo "${YELLOW}stopped${NC}")"
+  echo -e "  llama.cpp:  $([ -f /opt/llama.cpp/llama-cli ] && echo "${GREEN}installed${NC}" || echo "${YELLOW}not found${NC}")"
+  echo -e "  Models dir: $Y7_MODELS_DIR"
+  local model_count=$(find "$Y7_MODELS_DIR" -name "*.gguf" 2>/dev/null | wc -l)
+  echo -e "  GGUF files: $model_count"
+  echo ""
+}
+
+# ── Main ──────────────────────────────────────────────────────
+main() {
+  local model_input="${1:-}"
+  local prompt_flag=false
+  local prompt_text=""
+
+  # Parse flags
+  case "$model_input" in
+    --help|-h)   show_help; exit 0 ;;
+    --status|-s) show_status; exit 0 ;;
+  esac
+
+  # Check for -p prompt flag
+  if [ "${2:-}" = "-p" ] && [ -n "${3:-}" ]; then
+    prompt_flag=true
+    prompt_text="$3"
+  fi
+
+  # Detect RAM and select backend
+  local ram=$(get_free_ram_mb)
+  local backend="${Y7_BACKEND:-$(select_backend "$ram")}"
+
+  # Default model based on backend and RAM
+  if [ -z "$model_input" ]; then
+    if [ "$ram" -gt 5000 ]; then
+      model_input="phi3:mini"
+    else
+      model_input="tinyllama"
+    fi
+  fi
+
+  # Resolve model name
+  local model=$(resolve_model "$model_input" "$backend")
+
+  # Run
+  if $prompt_flag; then
+    run_prompt "$model" "$prompt_text" "$backend"
+  elif [[ "$backend" == ollama* ]]; then
+    run_ollama "$model" "$backend"
+  else
+    run_llamacpp "$model" "$backend"
+  fi
+}
+
+main "$@"

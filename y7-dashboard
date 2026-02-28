@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""
+y7-dashboard — Y7 OS Live Web Dashboard
+Replaces terminal y7-status with a browser UI
+Run: y7-dashboard   →   open http://localhost:7700
+"""
+
+import http.server, json, subprocess, os, time, threading
+from urllib.parse import urlparse
+
+PORT = 7700
+
+def shell(cmd):
+    try:
+        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, timeout=5).decode().strip()
+    except:
+        return ""
+
+def get_stats():
+    # RAM
+    mem = shell("free -m | awk '/^Mem:/{print $2,$3,$7}'").split()
+    ram_total = int(mem[0]) if mem else 0
+    ram_used  = int(mem[1]) if len(mem)>1 else 0
+    ram_free  = int(mem[2]) if len(mem)>2 else 0
+
+    # CPU
+    cpu_pct = shell("top -bn1 | grep 'Cpu(s)' | awk '{print int($2)}'") or "0"
+
+    # Disk
+    disk = shell("df -BG / | awk 'NR==2{print $2,$3,$4}'").split()
+    disk_total = disk[0].replace('G','') if disk else "0"
+    disk_used  = disk[1].replace('G','') if len(disk)>1 else "0"
+    disk_free  = disk[2].replace('G','') if len(disk)>2 else "0"
+
+    # ZRAM
+    zram_used = shell("[ -f /sys/block/zram0/mem_used_total ] && cat /sys/block/zram0/mem_used_total || echo 0")
+    zram_mb = int(zram_used or 0) // (1024*1024)
+
+    # Ollama
+    ollama_status = "running" if shell("curl -s http://localhost:11434") else "stopped"
+    ollama_model  = shell("ollama ps 2>/dev/null | grep -v NAME | awk '{print $1}' | head -1") or "none"
+
+    # Models
+    models_raw = shell("ollama list 2>/dev/null | grep -v NAME | awk '{print $1, $3, $4}'")
+    models = []
+    for line in models_raw.splitlines():
+        parts = line.split()
+        if parts:
+            models.append({"name": parts[0], "size": " ".join(parts[1:]) if len(parts)>1 else "?"})
+
+    # WebUI
+    webui_status = "running" if shell("curl -s http://localhost:8080") else "stopped"
+
+    # CPU info
+    cpu_model = shell("grep -m1 'model name' /proc/cpuinfo | cut -d: -f2").strip()
+    cpu_cores = shell("nproc")
+    avx2 = "yes" if "avx2" in shell("grep flags /proc/cpuinfo | head -1").lower() else "no"
+
+    # Y7 lang
+    lang = "en"
+    if os.path.exists("/etc/y7/lang.conf"):
+        lang_raw = shell("grep Y7_LANG /etc/y7/lang.conf | cut -d= -f2 | tr -d '\"'")
+        lang = lang_raw or "en"
+
+    # Bench results
+    bench = []
+    bench_file = "/ai/benchmarks/results.csv"
+    if os.path.exists(bench_file):
+        lines = open(bench_file).readlines()[1:6]  # skip header, take 5
+        for line in lines:
+            parts = line.strip().split("|")
+            if len(parts) >= 5:
+                bench.append({"model": parts[0], "test": parts[1], "tps": parts[2], "quality": parts[4]})
+
+    return {
+        "ram": {"total": ram_total, "used": ram_used, "free": ram_free,
+                "pct": int(ram_used*100/ram_total) if ram_total else 0},
+        "cpu": {"pct": int(cpu_pct), "model": cpu_model, "cores": cpu_cores, "avx2": avx2},
+        "disk": {"total": disk_total, "used": disk_used, "free": disk_free,
+                 "pct": int(int(disk_used)*100/int(disk_total)) if disk_total and int(disk_total)>0 else 0},
+        "zram": {"mb": zram_mb},
+        "ollama": {"status": ollama_status, "model": ollama_model},
+        "webui": {"status": webui_status},
+        "models": models,
+        "cpu_info": cpu_model,
+        "lang": lang,
+        "bench": bench,
+        "ts": time.strftime("%H:%M:%S")
+    }
+
+HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Y7 OS Dashboard</title>
+<style>
+  :root{--bg:#080c10;--surface:#0d1117;--border:#1e2d3d;--accent:#00d4ff;--green:#00ff88;--warn:#ffb800;--red:#ff4757;--text:#c9d1d9;--muted:#556070;--mono:'JetBrains Mono',monospace}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:0.15;pointer-events:none;z-index:0}
+
+  header{background:rgba(8,12,16,.95);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+  .logo{color:var(--accent);font-weight:700;font-size:1.1rem;letter-spacing:-.02em}.logo span{color:var(--text);font-weight:300}
+  .hright{display:flex;gap:16px;align-items:center}
+  #ts{color:var(--muted);font-size:.75rem}
+  .hlang{background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent);padding:3px 10px;border-radius:3px;font-size:.7rem}
+
+  main{padding:24px;max-width:1200px;margin:0 auto;position:relative;z-index:1}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;position:relative;overflow:hidden;transition:border-color .2s}
+  .card:hover{border-color:rgba(0,212,255,.3)}
+  .card-label{font-size:.65rem;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px}
+  .card-value{font-size:1.6rem;font-weight:700;color:#fff;line-height:1}
+  .card-sub{font-size:.72rem;color:var(--muted);margin-top:6px}
+  .card-bar{height:3px;background:var(--border);border-radius:2px;margin-top:12px;overflow:hidden}
+  .card-bar-fill{height:100%;border-radius:2px;transition:width .8s ease}
+  .ok{color:var(--green)}.warn{color:var(--warn)}.bad{color:var(--red)}
+
+  .section-title{font-size:.7rem;color:var(--accent);letter-spacing:.15em;text-transform:uppercase;margin:20px 0 10px}
+
+  .services{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px}
+  .svc{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:12px}
+  .svc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .svc-dot.running{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .svc-dot.stopped{background:var(--muted)}
+  .svc-name{font-weight:600;color:#fff;font-size:.85rem}
+  .svc-detail{font-size:.72rem;color:var(--muted);margin-top:2px}
+
+  .models-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px}
+  .models-table th{padding:10px 16px;background:rgba(0,212,255,.05);color:var(--accent);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;text-align:left;border-bottom:1px solid var(--border)}
+  .models-table td{padding:11px 16px;border-bottom:1px solid rgba(30,45,61,.4);color:var(--text);font-size:.8rem}
+  .models-table tr:last-child td{border-bottom:none}
+  .models-table tr:hover td{background:rgba(0,212,255,.03)}
+  .model-name{color:var(--accent)}
+
+  .bench-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .bench-table th{padding:10px 16px;background:rgba(0,255,136,.05);color:var(--green);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;text-align:left;border-bottom:1px solid var(--border)}
+  .bench-table td{padding:10px 16px;border-bottom:1px solid rgba(30,45,61,.4);font-size:.8rem}
+  .bench-table tr:last-child td{border-bottom:none}
+  .bench-table tr:hover td{background:rgba(0,255,136,.02)}
+  .quality-good{color:var(--green)}.quality-ok{color:var(--warn)}.quality-bad{color:var(--red)}
+
+  .cpu-info{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 18px;font-size:.78rem;color:var(--muted);margin-bottom:20px}
+  .cpu-info span{color:var(--text)}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  .btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:5px;font-family:var(--mono);font-size:.75rem;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-green{border-color:rgba(0,255,136,.3);color:var(--green)}
+  .btn-green:hover{border-color:var(--green);background:rgba(0,255,136,.05)}
+
+  #refresh-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite;margin-right:6px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .empty{color:var(--muted);font-size:.8rem;padding:20px;text-align:center}
+
+  @media(max-width:600px){.grid{grid-template-columns:1fr 1fr}.actions{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Y7<span> OS</span> Dashboard</div>
+  <div class="hright">
+    <span id="refresh-dot"></span>
+    <span id="ts">--:--:--</span>
+    <span id="lang-badge" class="hlang">EN</span>
+  </div>
+</header>
+
+<main>
+  <!-- Stat Cards -->
+  <div class="grid" id="cards">
+    <div class="card"><div class="card-label">RAM Used</div><div class="card-value" id="ram-pct">--%</div><div class="card-sub" id="ram-sub">-- / -- MB</div><div class="card-bar"><div class="card-bar-fill" id="ram-bar" style="width:0%;background:var(--accent)"></div></div></div>
+    <div class="card"><div class="card-label">CPU Load</div><div class="card-value" id="cpu-pct">--%</div><div class="card-sub" id="cpu-sub">-- cores</div><div class="card-bar"><div class="card-bar-fill" id="cpu-bar" style="width:0%;background:var(--green)"></div></div></div>
+    <div class="card"><div class="card-label">Disk Used</div><div class="card-value" id="disk-pct">--%</div><div class="card-sub" id="disk-sub">-- GB free</div><div class="card-bar"><div class="card-bar-fill" id="disk-bar" style="width:0%;background:var(--warn)"></div></div></div>
+    <div class="card"><div class="card-label">ZRAM</div><div class="card-value" id="zram-val">-- MB</div><div class="card-sub">Compressed swap</div></div>
+  </div>
+
+  <!-- CPU Info -->
+  <div class="cpu-info" id="cpu-info">CPU: <span>loading...</span></div>
+
+  <!-- Services -->
+  <div class="section-title">// Services</div>
+  <div class="services">
+    <div class="svc"><div class="svc-dot" id="ollama-dot"></div><div><div class="svc-name">Ollama</div><div class="svc-detail" id="ollama-detail">checking...</div></div></div>
+    <div class="svc"><div class="svc-dot" id="webui-dot"></div><div><div class="svc-name">Open WebUI</div><div class="svc-detail" id="webui-detail">checking...</div></div></div>
+    <div class="svc"><div class="svc-dot running"></div><div><div class="svc-name">Y7 Dashboard</div><div class="svc-detail">http://localhost:7700</div></div></div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="section-title">// Quick Actions</div>
+  <div class="actions">
+    <a class="btn btn-green" href="http://localhost:8080" target="_blank">🌐 Open WebUI</a>
+    <button class="btn" onclick="runCmd('ollama run phi3:mini')">💬 Chat (phi3)</button>
+    <button class="btn" onclick="runCmd('y7-models recommend')">🏆 Recommend Model</button>
+    <button class="btn" onclick="runCmd('y7-bench quick')">⚡ Quick Benchmark</button>
+    <button class="btn" onclick="refresh()">🔄 Refresh</button>
+  </div>
+
+  <!-- Models -->
+  <div class="section-title">// Downloaded Models</div>
+  <table class="models-table">
+    <thead><tr><th>Model</th><th>Size</th><th>Action</th></tr></thead>
+    <tbody id="models-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+  </table>
+
+  <!-- Benchmarks -->
+  <div class="section-title">// Benchmark Results</div>
+  <table class="bench-table">
+    <thead><tr><th>Model</th><th>Test</th><th>Speed (tok/s)</th><th>Quality</th></tr></thead>
+    <tbody id="bench-body"><tr><td colspan="4" class="empty">No benchmarks yet — run: y7-bench all</td></tr></tbody>
+  </table>
+</main>
+
+<script>
+function color(pct){return pct>85?'var(--red)':pct>65?'var(--warn)':'var(--accent)'}
+function qualityClass(q){return q==='Good'?'quality-good':q==='OK'?'quality-ok':'quality-bad'}
+
+async function refresh(){
+  try{
+    const d = await fetch('/api/stats').then(r=>r.json())
+
+    // Cards
+    document.getElementById('ram-pct').textContent = d.ram.pct+'%'
+    document.getElementById('ram-sub').textContent = `${d.ram.used} / ${d.ram.total} MB`
+    document.getElementById('ram-bar').style.cssText = `width:${d.ram.pct}%;background:${color(d.ram.pct)}`
+
+    document.getElementById('cpu-pct').textContent = d.cpu.pct+'%'
+    document.getElementById('cpu-sub').textContent = `${d.cpu.cores} cores • AVX2: ${d.cpu.avx2}`
+    document.getElementById('cpu-bar').style.cssText = `width:${d.cpu.pct}%;background:${color(d.cpu.pct)}`
+
+    document.getElementById('disk-pct').textContent = d.disk.pct+'%'
+    document.getElementById('disk-sub').textContent = `${d.disk.free}GB free of ${d.disk.total}GB`
+    document.getElementById('disk-bar').style.cssText = `width:${d.disk.pct}%;background:${color(d.disk.pct)}`
+
+    document.getElementById('zram-val').textContent = d.zram.mb+'MB'
+
+    // CPU info
+    document.getElementById('cpu-info').innerHTML = `CPU: <span>${d.cpu_info}</span> &nbsp;|&nbsp; Cores: <span>${d.cpu.cores}</span> &nbsp;|&nbsp; AVX2: <span>${d.cpu.avx2}</span>`
+
+    // Services
+    const od = document.getElementById('ollama-dot')
+    od.className = 'svc-dot ' + (d.ollama.status==='running'?'running':'stopped')
+    document.getElementById('ollama-detail').textContent = d.ollama.status==='running' ? `Running • ${d.ollama.model||'idle'}` : 'Stopped — run: ollama serve'
+
+    const wd = document.getElementById('webui-dot')
+    wd.className = 'svc-dot ' + (d.webui.status==='running'?'running':'stopped')
+    document.getElementById('webui-detail').textContent = d.webui.status==='running' ? 'http://localhost:8080' : 'Stopped'
+
+    // Lang
+    document.getElementById('lang-badge').textContent = d.lang.toUpperCase()
+
+    // Models
+    const mb = document.getElementById('models-body')
+    if(d.models.length===0){
+      mb.innerHTML='<tr><td colspan="3" class="empty">No models — run: y7-models download phi3</td></tr>'
+    } else {
+      mb.innerHTML = d.models.map(m=>`
+        <tr>
+          <td class="model-name">${m.name}</td>
+          <td>${m.size}</td>
+          <td><button class="btn" style="padding:4px 10px;font-size:.7rem" onclick="chatWith('${m.name}')">Chat</button></td>
+        </tr>`).join('')
+    }
+
+    // Bench
+    const bb = document.getElementById('bench-body')
+    if(d.bench.length===0){
+      bb.innerHTML='<tr><td colspan="4" class="empty">No benchmarks yet — run: y7-bench all</td></tr>'
+    } else {
+      bb.innerHTML = d.bench.map(b=>`
+        <tr>
+          <td class="model-name">${b.model}</td>
+          <td>${b.test}</td>
+          <td>${b.tps} tok/s</td>
+          <td class="${qualityClass(b.quality)}">${b.quality}</td>
+        </tr>`).join('')
+    }
+
+    document.getElementById('ts').textContent = d.ts
+  } catch(e){ console.error(e) }
+}
+
+function chatWith(model){
+  alert(`Open a terminal and run:\n\ny7-ai ${model}`)
+}
+function runCmd(cmd){
+  alert(`Open a terminal and run:\n\n${cmd}`)
+}
+
+refresh()
+setInterval(refresh, 5000)
+</script>
+</body>
+</html>"""
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, format, *args): pass  # silence logs
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        if path == '/api/stats':
+            data = json.dumps(get_stats()).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', len(data))
+            self.end_headers()
+            self.wfile.write(data)
+        else:
+            page = HTML.encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', len(page))
+            self.end_headers()
+            self.wfile.write(page)
+
+if __name__ == '__main__':
+    import webbrowser
+    print(f"\n  \033[1m\033[34mY7 OS Dashboard\033[0m")
+    print(f"  ─────────────────────────────")
+    print(f"  URL:  \033[36mhttp://localhost:{PORT}\033[0m")
+    print(f"  Stop: Ctrl+C")
+    print(f"  Auto-refreshes every 5 seconds\n")
+
+    server = http.server.HTTPServer(('', PORT), Handler)
+    threading.Timer(1.2, lambda: webbrowser.open(f'http://localhost:{PORT}')).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n  Dashboard stopped.")
