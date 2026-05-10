@@ -1,0 +1,160 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-ai — Y7 OS Intelligent AI Launcher
+#  Detects RAM, picks best model, launches Ollama
+#  github.com/yahyasaqban-lab/y7os
+#  MIT License
+# ─────────────────────────────────────────────────────────────
+
+set -e
+
+# ── Colors ────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+
+# ── Helpers ───────────────────────────────────────────────────
+log_info() { echo -e "${CYAN}[Y7]${NC} $1" >&2; }
+log_ok()   { echo -e "${GREEN}[Y7]${NC} $1" >&2; }
+log_err()  { echo -e "${RED}[Y7]${NC} $1" >&2; }
+
+get_free_ram_mb() { free -m | awk '/^Mem:/{print $7}'; }
+
+pick_model() {
+  local ram=$(get_free_ram_mb)
+  if   [ $ram -gt 12000 ]; then echo "mistral:7b-q4_k_m"
+  elif [ $ram -gt 5000  ]; then echo "phi3:mini"
+  elif [ $ram -gt 3000  ]; then echo "gemma:2b"
+  else                          echo "tinyllama"
+  fi
+}
+
+ensure_ollama() {
+  if ! command -v ollama &>/dev/null; then
+    log_err "Ollama not installed. Run: curl -fsSL https://ollama.ai/install.sh | sh"
+    exit 1
+  fi
+  if ! curl -s --max-time 2 http://localhost:11434 &>/dev/null; then
+    log_info "Starting Ollama..."
+    ollama serve &>/dev/null &
+    local waited=0
+    while ! curl -s --max-time 1 http://localhost:11434 &>/dev/null; do
+      sleep 1; waited=$((waited+1))
+      [ $waited -gt 10 ] && { log_err "Ollama failed to start"; exit 1; }
+    done
+  fi
+}
+
+# ── Help ──────────────────────────────────────────────────────
+show_help() {
+  echo ""
+  echo -e "${BOLD}  y7-ai — Y7 OS AI Launcher${NC}"
+  echo -e "  ${CYAN}github.com/yahyasaqban-lab/y7os${NC}"
+  echo ""
+  echo -e "  ${BOLD}Usage:${NC}"
+  echo -e "    ${CYAN}y7-ai${NC}                     Interactive chat (auto-picks model)"
+  echo -e "    ${CYAN}y7-ai \"your prompt\"${NC}       Single prompt, print response"
+  echo -e "    ${CYAN}echo \"prompt\" | y7-ai${NC}    Pipe input"
+  echo -e "    ${CYAN}y7-ai --model phi3${NC}        Use specific model"
+  echo ""
+  echo -e "  ${BOLD}Options:${NC}"
+  echo -e "    ${CYAN}--model <name>${NC}   Use specific model (e.g., phi3, mistral, tinyllama)"
+  echo -e "    ${CYAN}--lang ar${NC}        Use Arabic system prompt"
+  echo -e "    ${CYAN}--help${NC}           Show this help"
+  echo ""
+  echo -e "  ${BOLD}Examples:${NC}"
+  echo -e "    y7-ai \"explain bash loops\""
+  echo -e "    y7-ai --model mistral"
+  echo -e "    cat code.py | y7-ai \"review this code\""
+  echo -e "    y7-ai --lang ar \"ما هو لينكس؟\""
+  echo ""
+}
+
+# ── Parse Arguments ───────────────────────────────────────────
+MODEL=""
+PROMPT=""
+LANG_AR=false
+PIPE_INPUT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      show_help
+      exit 0
+      ;;
+    --model|-m)
+      MODEL="$2"
+      shift 2
+      ;;
+    --lang)
+      if [[ "$2" == "ar" ]]; then LANG_AR=true; fi
+      shift 2
+      ;;
+    *)
+      PROMPT="$1"
+      shift
+      ;;
+  esac
+done
+
+# Check for piped input
+if [ ! -t 0 ]; then
+  PIPE_INPUT=$(cat)
+fi
+
+# ── Select Model ──────────────────────────────────────────────
+if [ -z "$MODEL" ]; then
+  MODEL=$(pick_model)
+fi
+
+# Resolve short names to ollama tags
+case "$MODEL" in
+  phi3|phi)       MODEL="phi3:mini" ;;
+  mistral)        MODEL="mistral:7b-q4_k_m" ;;
+  llama3|llama)   MODEL="llama3.1:8b-q4_K_M" ;;
+  gemma)          MODEL="gemma:2b" ;;
+  qwen|qwen2)     MODEL="qwen2:7b-q4_K_M" ;;
+  tiny|tinyllama) MODEL="tinyllama" ;;
+esac
+
+# ── Ensure Ollama Running ─────────────────────────────────────
+ensure_ollama
+
+# ── Run ───────────────────────────────────────────────────────
+ram_mb=$(get_free_ram_mb)
+log_info "Model: ${BOLD}$MODEL${NC}  |  Free RAM: ${ram_mb}MB"
+
+# Build system prompt
+SYS_PROMPT=""
+if [ "$LANG_AR" = true ]; then
+  SYS_PROMPT="أنت مساعد ذكاء اصطناعي مفيد. أجب بالعربية بشكل واضح وموجز."
+fi
+
+# If we have piped input, prepend it to the prompt
+if [ -n "$PIPE_INPUT" ]; then
+  if [ -n "$PROMPT" ]; then
+    PROMPT="$PROMPT
+
+---
+$PIPE_INPUT"
+  else
+    PROMPT="$PIPE_INPUT"
+  fi
+fi
+
+# Interactive mode (no prompt given)
+if [ -z "$PROMPT" ]; then
+  log_ok "Starting interactive chat. Type /bye to exit."
+  echo ""
+  if [ -n "$SYS_PROMPT" ]; then
+    ollama run "$MODEL" --system "$SYS_PROMPT"
+  else
+    ollama run "$MODEL"
+  fi
+else
+  # Single prompt mode
+  if [ -n "$SYS_PROMPT" ]; then
+    echo "$PROMPT" | ollama run "$MODEL" --system "$SYS_PROMPT"
+  else
+    echo "$PROMPT" | ollama run "$MODEL"
+  fi
+fi

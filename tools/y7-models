@@ -89,8 +89,8 @@ cmd_available() {
   printf "  %s\n" "────────────────────────────────────────────────────────────────────────────────────────"
   for entry in "${MODEL_REGISTRY[@]}"; do
     IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
-    # Highlight if fits in current RAM
-    if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || echo 0) )); then
+    local min_ram_int=${min_ram%.*}
+    if [ "$free_ram" -ge "$min_ram_int" ]; then
       color="${GREEN}"
     else
       color="${YELLOW}"
@@ -174,7 +174,8 @@ cmd_info() {
       echo -e "  Description:  $desc"
       echo ""
       local free_ram=$(get_free_ram_gb)
-      if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || echo 0) )); then
+      local min_ram_int=${min_ram%.*}
+      if [ "$free_ram" -ge "$min_ram_int" ]; then
         log_ok "This model fits your current free RAM (${free_ram}GB)"
       else
         log_warn "Your free RAM (${free_ram}GB) is below minimum (${min_ram}GB)"
@@ -210,7 +211,8 @@ cmd_recommend() {
   local count=0
   for entry in "${MODEL_REGISTRY[@]}"; do
     IFS='|' read -r sname tag size min_ram arabic desc <<< "$entry"
-    if (( $(echo "$free_ram >= $min_ram" | bc -l 2>/dev/null || [ "$free_ram" -ge "$min_ram" ] && echo 1 || echo 0) )); then
+    local min_ram_int=${min_ram%.*}
+    if [ "$free_ram" -ge "$min_ram_int" ]; then
       count=$((count + 1))
       if [ $count -eq 1 ]; then
         echo -e "  ${GREEN}${BOLD}1. $tag${NC} — ${desc}"
