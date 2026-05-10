@@ -14,6 +14,9 @@ on:
 env:
   DEBIAN_FRONTEND: noninteractive
 
+permissions:
+  contents: write
+
 jobs:
   build-iso:
     runs-on: ubuntu-latest
@@ -47,7 +50,8 @@ jobs:
             grub-pc-bin \
             grub-efi-amd64-bin \
             mtools \
-            dosfstools
+            dosfstools \
+            debian-archive-keyring
 
       - name: Create live-build config
         run: |
@@ -56,6 +60,9 @@ jobs:
           lb config \
             --distribution bookworm \
             --archive-areas "main contrib non-free-firmware" \
+            --mirror-bootstrap "http://deb.debian.org/debian" \
+            --mirror-chroot "http://deb.debian.org/debian" \
+            --mirror-binary "http://deb.debian.org/debian" \
             --debian-installer none \
             --binary-images iso-hybrid \
             --iso-application "Y7 OS" \
@@ -873,7 +880,8 @@ jobs:
             qemu-user-static \
             binfmt-support \
             squashfs-tools \
-            xorriso
+            xorriso \
+            debian-archive-keyring
 
       - name: Build ARM64 ISO
         run: |
@@ -883,6 +891,9 @@ jobs:
             --distribution bookworm \
             --architectures arm64 \
             --archive-areas "main contrib non-free-firmware" \
+            --mirror-bootstrap "http://deb.debian.org/debian" \
+            --mirror-chroot "http://deb.debian.org/debian" \
+            --mirror-binary "http://deb.debian.org/debian" \
             --debian-installer none \
             --binary-images iso-hybrid \
             --iso-application "Y7 OS ARM64" \
