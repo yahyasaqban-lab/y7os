@@ -77,7 +77,10 @@ jobs:
           if [ "${{ matrix.arch }}" = "amd64" ]; then
             apt-get install -y grub-pc-bin grub-efi-amd64-bin
           else
-            apt-get install -y grub-efi-arm64-bin
+            # ARM64: enable multi-arch for cross-building
+            dpkg --add-architecture arm64
+            apt-get update
+            apt-get install -y grub-efi-arm64-bin:arm64
           fi
 
       - name: Create live-build config
