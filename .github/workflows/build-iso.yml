@@ -58,7 +58,12 @@ jobs:
           mkdir -p build && cd build
 
           lb config \
+            --mode debian \
             --distribution bookworm \
+            --parent-distribution bookworm \
+            --parent-mirror-bootstrap "http://deb.debian.org/debian" \
+            --parent-mirror-chroot "http://deb.debian.org/debian" \
+            --parent-mirror-binary "http://deb.debian.org/debian" \
             --archive-areas "main contrib non-free-firmware" \
             --mirror-bootstrap "http://deb.debian.org/debian" \
             --mirror-chroot "http://deb.debian.org/debian" \
@@ -891,8 +896,13 @@ jobs:
           mkdir -p build-arm64 && cd build-arm64
 
           lb config \
+            --mode debian \
             --distribution bookworm \
+            --parent-distribution bookworm \
             --architectures arm64 \
+            --parent-mirror-bootstrap "http://deb.debian.org/debian" \
+            --parent-mirror-chroot "http://deb.debian.org/debian" \
+            --parent-mirror-binary "http://deb.debian.org/debian" \
             --archive-areas "main contrib non-free-firmware" \
             --mirror-bootstrap "http://deb.debian.org/debian" \
             --mirror-chroot "http://deb.debian.org/debian" \
