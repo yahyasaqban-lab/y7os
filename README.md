@@ -32,7 +32,7 @@ Y7 OS is a **Linux distribution built for local AI**. It turns any computer — 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Y7 OS v0.2.6                                               │
+│  Y7 OS v0.3.0                                               │
 │                                                             │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
 │  │   Ollama    │  │  Open WebUI │  │   Docker    │         │
@@ -40,11 +40,11 @@ Y7 OS is a **Linux distribution built for local AI**. It turns any computer — 
 │  └─────────────┘  └─────────────┘  └─────────────┘         │
 │                                                             │
 │  ┌─────────────────────────────────────────────────┐       │
-│  │  y7-ai  │  y7-models  │  y7-status  │  y7-bench │       │
+│  │  y7-ai │ y7-models │ y7-status │ y7-gpu │ y7-persist   │
 │  └─────────────────────────────────────────────────┘       │
 │                                                             │
 │  ┌─────────────────────────────────────────────────┐       │
-│  │              Debian Bookworm Base               │       │
+│  │       Debian Bookworm (AMD64 + ARM64)           │       │
 │  └─────────────────────────────────────────────────┘       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -53,19 +53,26 @@ Y7 OS is a **Linux distribution built for local AI**. It turns any computer — 
 
 ## Download
 
-### Latest Release: v0.2.6
+### Latest Release: v0.3.0
 
-| Architecture | Download | Size |
-|--------------|----------|------|
-| **AMD64** (Intel/AMD) | [y7os-0.2.6-amd64.iso](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.2.6/y7os-0.2.6-amd64.iso) | 982 MB |
+| Architecture | Download | Size | Use Case |
+|--------------|----------|------|----------|
+| **AMD64** | [y7os-0.3.0-amd64.iso](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.3.0/y7os-0.3.0-amd64.iso) | ~1.5 GB | Intel/AMD PCs, laptops |
+| **ARM64** | [y7os-0.3.0-arm64.iso](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.3.0/y7os-0.3.0-arm64.iso) | ~1.5 GB | Raspberry Pi 4/5, Pine64 |
 
-**Checksum:** [SHA256](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.2.6/y7os-0.2.6-amd64.iso.sha256)
+**Checksums:** [AMD64](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.3.0/y7os-0.3.0-amd64.iso.sha256) | [ARM64](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.3.0/y7os-0.3.0-arm64.iso.sha256)
+
+### What's New in v0.3.0
+- **ARM64 support** — Raspberry Pi 4/5, Apple Silicon (via UTM)
+- **NVIDIA GPU detection** — `y7-gpu detect` and driver installation
+- **Persistence mode** — Save data across reboots with `y7-persist`
+- **TinyLlama bundled** — Works offline immediately!
 
 ### Flash to USB
 
 ```bash
 # Linux/macOS
-sudo dd if=y7os-0.2.6-amd64.iso of=/dev/sdX bs=4M status=progress
+sudo dd if=y7os-0.3.0-amd64.iso of=/dev/sdX bs=4M status=progress
 
 # Or use Balena Etcher, Rufus, Ventoy
 ```
@@ -76,8 +83,10 @@ sudo dd if=y7os-0.2.6-amd64.iso of=/dev/sdX bs=4M status=progress
 
 ### Pre-installed AI Stack
 - **Ollama** — Run LLMs locally (Llama, Mistral, Qwen, Phi)
+- **TinyLlama bundled** — Works offline, no download needed!
 - **Open WebUI** — ChatGPT-like interface at `localhost:3000`
 - **Docker** — Container runtime for AI tools
+- **NVIDIA GPU support** — Auto-detection and easy driver install
 - **y7 Tools** — CLI tools for AI management
 
 ### Optimized for Low Resources
