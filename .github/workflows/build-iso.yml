@@ -69,7 +69,7 @@ jobs:
             --iso-publisher "Yahya Saqban" \
             --iso-volume "Y7OS-${{ steps.version.outputs.version }}" \
             --memtest none \
-            --bootappend-live "boot=live components quiet splash" \
+            --bootappend-live "boot=live components quiet splash persistence" \
             --apt-recommends false \
             --security false
 
@@ -81,6 +81,8 @@ jobs:
           cat > config/package-lists/y7os.list.chroot << 'EOF'
           linux-image-amd64
           live-boot
+          live-config
+          live-tools
           systemd-sysv
           sudo
           locales
@@ -148,6 +150,12 @@ jobs:
             touch ~/.y7os-welcomed
           fi
           BASHRC
+
+      - name: Run live-friendly enhancements
+        run: |
+          if [ -f scripts/enhance-live-friendly.sh ]; then
+            bash scripts/enhance-live-friendly.sh "${{ steps.version.outputs.version }}"
+          fi
 
       - name: Add boot hooks
         run: |
