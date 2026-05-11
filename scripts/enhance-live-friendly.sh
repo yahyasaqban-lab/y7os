@@ -3,11 +3,13 @@
 set -euo pipefail
 
 VERSION="${1:-0.3.0}"
-WORKDIR="$(pwd)/build"
+WORKDIR="$(pwd)"
 
 echo "=== Y7 OS v${VERSION} Live-Friendly Build ==="
 
-# ─── Step 1: Generate persistence hook ───
+# ─── Step 1: cd to build dir ───
+cd "$WORKDIR"
+
 cat > config/hooks/live/9100-persistence.hook.chroot << 'HOOK'
 #!/bin/bash
 # Enable live-boot persistence

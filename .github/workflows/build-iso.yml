@@ -123,10 +123,10 @@ jobs:
           mkdir -p config/includes.chroot/usr/local/bin
           mkdir -p config/includes.chroot/etc/skel
 
-          # Copy y7 tools
-          cp tools/y7-ai config/includes.chroot/usr/local/bin/ || true
-          cp tools/y7-models config/includes.chroot/usr/local/bin/ || true
-          cp tools/y7-status config/includes.chroot/usr/local/bin/ || true
+          # Copy y7 tools (from repo root: parent of build dir)
+          cp ../tools/y7-ai config/includes.chroot/usr/local/bin/ || true
+          cp ../tools/y7-models config/includes.chroot/usr/local/bin/ || true
+          cp ../tools/y7-status config/includes.chroot/usr/local/bin/ || true
           chmod +x config/includes.chroot/usr/local/bin/y7-* 2>/dev/null || true
 
           # Bashrc
