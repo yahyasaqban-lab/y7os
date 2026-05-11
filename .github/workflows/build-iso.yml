@@ -20,6 +20,9 @@ permissions:
 jobs:
   build-iso:
     runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+      options: --privileged
     timeout-minutes: 180
 
     steps:
@@ -29,7 +32,7 @@ jobs:
       - name: Set version
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "push" ]]; then
+          if [ "${{ github.event_name }}" = "push" ]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
             VERSION="${{ github.event.inputs.version }}"
@@ -39,8 +42,8 @@ jobs:
 
       - name: Install live-build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
             live-build \
             debootstrap \
             squashfs-tools \
@@ -51,58 +54,37 @@ jobs:
             grub-efi-amd64-bin \
             mtools \
             dosfstools \
-            debian-archive-keyring
+            git
 
       - name: Create live-build config
         run: |
           mkdir -p build && cd build
 
           lb config \
-            --mode debian \
             --distribution bookworm \
-            --parent-distribution bookworm \
-            --parent-mirror-bootstrap "http://deb.debian.org/debian" \
-            --parent-mirror-chroot "http://deb.debian.org/debian" \
-            --parent-mirror-binary "http://deb.debian.org/debian" \
             --archive-areas "main contrib non-free-firmware" \
-            --mirror-bootstrap "http://deb.debian.org/debian" \
-            --mirror-chroot "http://deb.debian.org/debian" \
-            --mirror-binary "http://deb.debian.org/debian" \
-            --mirror-chroot-security "none" \
-            --mirror-binary-security "none" \
-            --security false \
             --debian-installer none \
             --binary-images iso-hybrid \
             --iso-application "Y7 OS" \
-            --iso-publisher "Yahya Saqban <yahyasaqban@gmail.com>" \
+            --iso-publisher "Yahya Saqban" \
             --iso-volume "Y7OS-${{ steps.version.outputs.version }}" \
             --memtest none \
-            --win32-loader false \
             --bootappend-live "boot=live components quiet splash" \
             --apt-recommends false \
-            --firmware-binary true \
-            --firmware-chroot true
+            --security false
 
       - name: Configure package lists
         run: |
           cd build
           mkdir -p config/package-lists
 
-          # ============================================
-          # Y7 OS COMPLETE PACKAGE LIST
-          # 94+ Pre-installed tools
-          # ============================================
-
-          cat > config/package-lists/y7os-core.list.chroot << 'EOF'
-          # Core system
+          cat > config/package-lists/y7os.list.chroot << 'EOF'
           linux-image-amd64
           live-boot
           systemd-sysv
           sudo
           locales
           console-setup
-
-          # Network
           network-manager
           curl
           wget
@@ -110,683 +92,191 @@ jobs:
           gnupg
           openssh-client
           openssh-server
-
-          # Container runtime
           docker.io
-          docker-compose
-          podman
-
-          # Memory optimization
-          zram-tools
-
-          # Hardware support
-          firmware-linux-free
-          pciutils
-          usbutils
-          EOF
-
-          cat > config/package-lists/y7os-devtools.list.chroot << 'EOF'
-          # Developer Tools
           git
-          gh
-          socat
-          netcat-openbsd
-          jq
           htop
           btop
           tmux
           neofetch
           bash-completion
           nano
-          vim
-          ranger
-
-          # Modern CLI replacements
-          ripgrep
-          fd-find
-          fzf
-          bat
-          exa
-
-          # Build essentials
-          build-essential
-          cmake
-          pkg-config
-          EOF
-
-          cat > config/package-lists/y7os-python.list.chroot << 'EOF'
-          # Python stack
+          vim-tiny
+          zram-tools
           python3
           python3-pip
           python3-venv
-          python3-dev
-          python3-numpy
-          python3-pandas
-          python3-matplotlib
-          python3-scipy
-          python3-sklearn
-          python3-sympy
-          EOF
-
-          cat > config/package-lists/y7os-media.list.chroot << 'EOF'
-          # Media & Vision
+          ripgrep
+          fzf
+          jq
           ffmpeg
           imagemagick
-          tesseract-ocr
-          tesseract-ocr-ara
-          tesseract-ocr-eng
-          EOF
-
-          cat > config/package-lists/y7os-security.list.chroot << 'EOF'
-          # Privacy & Security
-          gnupg
-          age
-          wireguard-tools
-          tor
+          gpg
           ufw
-          fail2ban
-          EOF
-
-          cat > config/package-lists/y7os-infra.list.chroot << 'EOF'
-          # Infrastructure
           nginx
-          certbot
-          cron
-          pm2
           EOF
 
-      - name: Add Y7 OS tools and setup scripts
+      - name: Add Y7 OS tools
         run: |
           cd build
           mkdir -p config/includes.chroot/usr/local/bin
           mkdir -p config/includes.chroot/etc/skel
-          mkdir -p config/includes.chroot/etc/systemd/system
-          mkdir -p config/includes.chroot/opt/y7os
 
           # Copy y7 tools
-          cp ../tools/y7-ai config/includes.chroot/usr/local/bin/
-          cp ../tools/y7-models config/includes.chroot/usr/local/bin/
-          cp ../tools/y7-status config/includes.chroot/usr/local/bin/
-          chmod +x config/includes.chroot/usr/local/bin/y7-*
+          cp tools/y7-ai config/includes.chroot/usr/local/bin/ || true
+          cp tools/y7-models config/includes.chroot/usr/local/bin/ || true
+          cp tools/y7-status config/includes.chroot/usr/local/bin/ || true
+          chmod +x config/includes.chroot/usr/local/bin/y7-* 2>/dev/null || true
 
-          # ============================================
-          # y7-install: On-demand tool installer
-          # ============================================
-          cat > config/includes.chroot/usr/local/bin/y7-install << 'Y7INSTALL'
-          #!/bin/bash
-          # Y7 OS Tool Installer
-          # Usage: y7-install <tool>
-
-          set -e
-
-          TOOL="$1"
-
-          if [ -z "$TOOL" ]; then
-            echo "Y7 OS Tool Installer"
-            echo ""
-            echo "Usage: y7-install <tool>"
-            echo ""
-            echo "Available tools:"
-            echo "  vllm              - High-throughput LLM serving"
-            echo "  exllama           - Fast GPTQ/EXL2 inference"
-            echo "  librechat         - Multi-provider chat UI"
-            echo "  textgen-webui     - text-generation-webui"
-            echo "  anythingllm       - Document chat UI"
-            echo "  privategpt        - Private document chat"
-            echo "  unsloth-studio    - No-code training UI"
-            echo "  tabby             - Self-hosted Copilot"
-            echo "  continue          - VS Code AI assistant"
-            echo "  cody              - Sourcegraph code AI"
-            echo "  genkit            - Google AI framework"
-            echo "  tgi               - Text Generation Inference"
-            echo "  mergekit          - Model merging toolkit"
-            echo "  jupyter           - JupyterLab notebooks"
-            echo "  caddy             - Auto-HTTPS reverse proxy"
-            echo "  bark              - Text-to-speech"
-            echo "  coqui-tts         - Text-to-speech"
-            echo "  mlflow            - Experiment tracking"
-            echo "  wandb             - Weights & Biases"
-            exit 0
-          fi
-
-          case "$TOOL" in
-            vllm)
-              pip install vllm
-              echo "vLLM installed. Usage: python -m vllm.entrypoints.openai.api_server --model <model>"
-              ;;
-            exllama|exllamav2)
-              pip install exllamav2
-              echo "ExLlamaV2 installed."
-              ;;
-            librechat)
-              docker pull ghcr.io/danny-avila/librechat:latest
-              echo "LibreChat pulled. Run: docker run -p 3080:3080 ghcr.io/danny-avila/librechat:latest"
-              ;;
-            textgen-webui|text-generation-webui)
-              git clone https://github.com/oobabooga/text-generation-webui /opt/text-generation-webui
-              cd /opt/text-generation-webui && pip install -r requirements.txt
-              echo "text-generation-webui installed at /opt/text-generation-webui"
-              ;;
-            anythingllm)
-              docker pull mintplexlabs/anythingllm:latest
-              echo "AnythingLLM pulled. Run: docker run -p 3001:3001 mintplexlabs/anythingllm:latest"
-              ;;
-            privategpt)
-              pip install privategpt
-              echo "PrivateGPT installed."
-              ;;
-            unsloth-studio)
-              pip install unsloth[studio]
-              echo "Unsloth Studio installed. Run: unsloth-studio"
-              ;;
-            tabby)
-              docker pull tabbyml/tabby:latest
-              echo "Tabby pulled. Run: docker run -p 8080:8080 tabbyml/tabby:latest serve --model StarCoder-1B"
-              ;;
-            continue)
-              echo "Continue is a VS Code extension. Install from: https://continue.dev"
-              ;;
-            cody)
-              echo "Cody is a VS Code extension. Install from: https://sourcegraph.com/cody"
-              ;;
-            genkit)
-              npm install -g genkit-cli
-              pip install genkit
-              echo "Genkit installed. Run: genkit start"
-              ;;
-            tgi|text-generation-inference)
-              docker pull ghcr.io/huggingface/text-generation-inference:latest
-              echo "TGI pulled. Run: docker run -p 8080:80 ghcr.io/huggingface/text-generation-inference:latest --model-id <model>"
-              ;;
-            mergekit)
-              pip install mergekit
-              echo "Mergekit installed."
-              ;;
-            jupyter|jupyterlab)
-              pip install jupyterlab
-              echo "JupyterLab installed. Run: jupyter lab"
-              ;;
-            caddy)
-              sudo apt-get install -y caddy
-              echo "Caddy installed."
-              ;;
-            bark)
-              pip install git+https://github.com/suno-ai/bark.git
-              echo "Bark TTS installed."
-              ;;
-            coqui-tts|coqui)
-              pip install TTS
-              echo "Coqui TTS installed."
-              ;;
-            mlflow)
-              pip install mlflow
-              echo "MLflow installed. Run: mlflow ui"
-              ;;
-            wandb)
-              pip install wandb
-              echo "Weights & Biases installed. Run: wandb login"
-              ;;
-            *)
-              echo "Unknown tool: $TOOL"
-              echo "Run 'y7-install' without arguments to see available tools."
-              exit 1
-              ;;
-          esac
-          Y7INSTALL
-          chmod +x config/includes.chroot/usr/local/bin/y7-install
-
-          # ============================================
-          # Bashrc with welcome message
-          # ============================================
+          # Bashrc
           cat > config/includes.chroot/etc/skel/.bashrc << 'BASHRC'
-          # Y7 OS bashrc
           export PATH="$PATH:/usr/local/bin:$HOME/.local/bin"
-
-          # Aliases for modern CLI tools
-          alias ls='exa --icons 2>/dev/null || ls --color=auto'
-          alias ll='exa -la --icons 2>/dev/null || ls -la --color=auto'
-          alias cat='bat --style=plain 2>/dev/null || cat'
-          alias grep='rg 2>/dev/null || grep --color=auto'
-          alias find='fd 2>/dev/null || find'
-
-          # AI shortcuts
           alias ai='y7-ai'
           alias models='y7-models'
           alias status='y7-status'
 
-          # Welcome message on first login
           if [ ! -f ~/.y7os-welcomed ]; then
             echo ""
-            echo "══════════════════════════════════════════════════════════════"
-            echo "  ██╗   ██╗███████╗     ██████╗ ███████╗"
-            echo "  ╚██╗ ██╔╝╚════██║    ██╔═══██╗██╔════╝"
-            echo "   ╚████╔╝     ██╔╝    ██║   ██║███████╗"
-            echo "    ╚██╔╝     ██╔╝     ██║   ██║╚════██║"
-            echo "     ██║      ██║      ╚██████╔╝███████║"
-            echo "     ╚═╝      ╚═╝       ╚═════╝ ╚══════╝"
+            echo "══════════════════════════════════════════════════"
+            echo "  Y7 OS — AI Stack for Linux"
+            echo "  مرحباً بك في Y7 OS"
+            echo "══════════════════════════════════════════════════"
             echo ""
-            echo "  AI Stack for Linux — 94+ tools pre-installed"
-            echo "  مكدس الذكاء الاصطناعي للينكس"
-            echo "══════════════════════════════════════════════════════════════"
-            echo ""
-            echo "  🚀 Quick start:"
-            echo "     y7-ai              — Chat with AI"
-            echo "     y7-models          — Download/manage models"
-            echo "     y7-status          — System dashboard"
-            echo ""
-            echo "  🤖 AI CLIs installed:"
-            echo "     claude, gemini, copilot, codex, aider, sgpt, mods, llm"
-            echo ""
-            echo "  📦 Install more:      y7-install <tool>"
-            echo "  📚 Docs:              https://github.com/yahyasaqban-lab/y7os"
+            echo "  y7-ai       — Chat with AI"
+            echo "  y7-models   — Manage models"
+            echo "  y7-status   — System dashboard"
             echo ""
             touch ~/.y7os-welcomed
           fi
           BASHRC
 
-      - name: Add boot hooks (System setup)
+      - name: Add boot hooks
         run: |
           cd build
           mkdir -p config/hooks/live
 
-          cat > config/hooks/live/9000-y7os-setup.hook.chroot << 'HOOK'
+          cat > config/hooks/live/9000-y7os.hook.chroot << 'HOOK'
           #!/bin/bash
           set -e
 
-          echo "Y7 OS: Configuring system..."
-
-          # Enable ZRAM (50% of RAM as compressed swap)
+          # ZRAM
           echo "ALGO=zstd" > /etc/default/zramswap
           echo "PERCENT=50" >> /etc/default/zramswap
           systemctl enable zramswap || true
 
-          # Enable Docker
+          # Docker
           systemctl enable docker || true
 
-          # Create y7os user
+          # User
           useradd -m -s /bin/bash -G sudo,docker y7 2>/dev/null || true
           echo "y7:y7" | chpasswd
-
-          # Allow passwordless sudo for y7 user
           echo "y7 ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/y7os
           chmod 440 /etc/sudoers.d/y7os
 
-          # Set locales
+          # Locales
           echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
           echo "ar_SA.UTF-8 UTF-8" >> /etc/locale.gen
           locale-gen
-
-          # Fix fd/bat/exa symlinks (Debian names them differently)
-          ln -sf /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
-          ln -sf /usr/bin/batcat /usr/local/bin/bat 2>/dev/null || true
-
-          # Enable first-boot service
-          systemctl enable y7-first-boot.service || true
-
-          echo "Y7 OS: System configured successfully"
           HOOK
-          chmod +x config/hooks/live/9000-y7os-setup.hook.chroot
+          chmod +x config/hooks/live/9000-y7os.hook.chroot
 
-      - name: Add first-boot installer service
+      - name: Add first-boot service
         run: |
           cd build
+          mkdir -p config/includes.chroot/etc/systemd/system
 
-          # ============================================
-          # First Boot Script: Installs all AI tools
-          # ============================================
           cat > config/includes.chroot/usr/local/bin/y7-first-boot << 'SCRIPT'
           #!/bin/bash
-          # Y7 OS First Boot Setup
-          # Installs 94+ AI and developer tools
-
-          LOG="/var/log/y7-first-boot.log"
-          MARKER="/var/lib/y7os/.first-boot-done"
-
-          if [ -f "$MARKER" ]; then
-            exit 0
-          fi
-
+          MARKER="/var/lib/y7os/.done"
+          [ -f "$MARKER" ] && exit 0
           mkdir -p /var/lib/y7os
-          exec > >(tee -a "$LOG") 2>&1
-
-          echo "$(date): Y7 OS first boot setup starting..."
-          echo "This will install 94+ AI tools. Please wait..."
 
           # Wait for network
-          echo "Waiting for network..."
-          for i in {1..60}; do
-            if ping -c 1 google.com &>/dev/null; then
-              echo "Network connected."
-              break
-            fi
-            sleep 2
-          done
+          for i in {1..30}; do ping -c1 google.com &>/dev/null && break; sleep 2; done
 
-          # ============================================
-          # SECTION 1: Core AI Engines
-          # ============================================
-          echo ""
-          echo "=== Installing Core AI Engines ==="
-
-          # Ollama
-          echo "Installing Ollama..."
+          # Install Ollama
           curl -fsSL https://ollama.com/install.sh | sh
           systemctl enable ollama
           systemctl start ollama
 
-          # llama.cpp (via pip for easy install)
-          echo "Installing llama-cpp-python..."
-          pip install llama-cpp-python --break-system-packages
-
-          # LocalAI
-          echo "Installing LocalAI..."
-          curl -Lo /usr/local/bin/local-ai https://github.com/mudler/LocalAI/releases/latest/download/local-ai-linux-amd64
-          chmod +x /usr/local/bin/local-ai
-
-          # MLX (for Apple Silicon compatibility layer info)
-          pip install mlx mlx-lm --break-system-packages 2>/dev/null || echo "MLX skipped (requires Apple Silicon)"
-
-          # ============================================
-          # SECTION 2: AI CLI Tools (The Big 16)
-          # ============================================
-          echo ""
-          echo "=== Installing AI CLI Tools ==="
-
-          # Node.js (required for many CLIs)
-          echo "Installing Node.js..."
-          curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-          apt-get install -y nodejs
-
-          # Claude Code
-          echo "Installing Claude Code..."
-          npm install -g @anthropic-ai/claude-code || true
-
-          # Gemini CLI
-          echo "Installing Gemini CLI..."
-          npm install -g @anthropic-ai/gemini-cli 2>/dev/null || \
-          npm install -g gemini-cli 2>/dev/null || true
-
-          # GitHub Copilot CLI
-          echo "Installing GitHub Copilot CLI..."
-          npm install -g @github/copilot-cli || true
-
-          # OpenAI Codex CLI
-          echo "Installing Codex CLI..."
-          npm install -g @openai/codex-cli 2>/dev/null || \
-          pip install openai-codex --break-system-packages 2>/dev/null || true
-
-          # OpenCode (Go-based, most popular)
-          echo "Installing OpenCode..."
-          curl -fsSL https://raw.githubusercontent.com/opencode-ai/opencode/main/install.sh | sh 2>/dev/null || true
-
-          # OpenClaw
-          echo "Installing OpenClaw..."
-          npm install -g openclaw@latest || true
-
-          # Aider
-          echo "Installing Aider..."
-          pip install aider-chat --break-system-packages
-
-          # Open Interpreter
-          echo "Installing Open Interpreter..."
-          pip install open-interpreter --break-system-packages
-
-          # Shell-GPT
-          echo "Installing Shell-GPT..."
-          pip install shell-gpt --break-system-packages
-
-          # Fabric
-          echo "Installing Fabric..."
-          pip install fabric-ai --break-system-packages 2>/dev/null || \
-          go install github.com/danielmiessler/fabric@latest 2>/dev/null || true
-
-          # Mods
-          echo "Installing Mods..."
-          go install github.com/charmbracelet/mods@latest 2>/dev/null || true
-
-          # LLM (Simon Willison)
-          echo "Installing LLM CLI..."
-          pip install llm --break-system-packages
-
-          # aicommits
-          echo "Installing aicommits..."
-          npm install -g aicommits || true
-
-          # Goose
-          echo "Installing Goose..."
-          pip install goose-ai --break-system-packages 2>/dev/null || true
-
-          # ============================================
-          # SECTION 3: Hugging Face Stack
-          # ============================================
-          echo ""
-          echo "=== Installing Hugging Face Tools ==="
-
-          pip install --break-system-packages \
-            huggingface-hub \
-            transformers \
-            datasets \
-            accelerate \
-            peft \
-            trl \
-            sentence-transformers
-
-          # ============================================
-          # SECTION 4: Fine-Tuning Tools
-          # ============================================
-          echo ""
-          echo "=== Installing Fine-Tuning Tools ==="
-
-          # Unsloth
-          echo "Installing Unsloth..."
-          pip install unsloth --break-system-packages 2>/dev/null || true
-
-          # Axolotl
-          echo "Installing Axolotl..."
-          pip install axolotl --break-system-packages 2>/dev/null || true
-
-          # LLaMA-Factory
-          echo "Installing LLaMA-Factory..."
-          pip install llama-factory --break-system-packages 2>/dev/null || true
-
-          # ============================================
-          # SECTION 5: Python AI Stack
-          # ============================================
-          echo ""
-          echo "=== Installing Python AI Stack ==="
-
-          pip install --break-system-packages \
-            chromadb \
-            qdrant-client \
-            openai-whisper \
-            langchain \
-            langchain-community \
-            llama-index \
-            autogen \
-            crewai \
-            gradio \
-            streamlit \
-            opencv-python-headless \
-            easyocr \
-            plotly \
-            duckdb
-
-          # ============================================
-          # SECTION 6: Additional Tools
-          # ============================================
-          echo ""
-          echo "=== Installing Additional Tools ==="
-
-          # yt-dlp
-          pip install yt-dlp --break-system-packages
-
-          # lazygit
-          LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
-          curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
-          tar xf lazygit.tar.gz lazygit
-          mv lazygit /usr/local/bin/
-          rm lazygit.tar.gz
-
-          # lazydocker
-          curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
-
-          # zoxide
-          curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
-
-          # yq
-          pip install yq --break-system-packages
-
-          # Go (for some tools)
-          echo "Installing Go..."
-          curl -fsSL https://go.dev/dl/go1.22.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
-          echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> /etc/profile.d/go.sh
-
-          # ============================================
-          # SECTION 7: Open WebUI
-          # ============================================
-          echo ""
-          echo "=== Installing Open WebUI ==="
-
+          # Install Open WebUI
           docker pull ghcr.io/open-webui/open-webui:main
 
-          # Create systemd service for Open WebUI
-          cat > /etc/systemd/system/open-webui.service << 'WEBUI'
-          [Unit]
-          Description=Open WebUI
-          After=docker.service ollama.service
-          Requires=docker.service
-
-          [Service]
-          Type=simple
-          ExecStart=/usr/bin/docker run --rm --name open-webui -p 3000:8080 -v open-webui:/app/backend/data --add-host=host.docker.internal:host-gateway ghcr.io/open-webui/open-webui:main
-          ExecStop=/usr/bin/docker stop open-webui
-          Restart=always
-
-          [Install]
-          WantedBy=multi-user.target
-          WEBUI
-
-          systemctl enable open-webui.service
-
-          # ============================================
-          # SECTION 8: Download default model
-          # ============================================
-          echo ""
-          echo "=== Downloading AI Model ==="
-
-          # Wait for Ollama to be ready
+          # Download model based on RAM
           sleep 5
-
-          # Download recommended model based on RAM
-          RAM_GB=$(free -g | awk '/^Mem:/{print $2}')
-          if [ "$RAM_GB" -ge 8 ]; then
-            MODEL="llama3.1:8b-instruct-q4_0"
-          elif [ "$RAM_GB" -ge 6 ]; then
-            MODEL="qwen2.5:7b-instruct-q4_0"
-          elif [ "$RAM_GB" -ge 4 ]; then
-            MODEL="phi3:mini"
-          else
-            MODEL="tinyllama"
-          fi
-
-          echo "Downloading model: $MODEL (Detected RAM: ${RAM_GB}GB)"
+          RAM=$(free -g | awk '/Mem:/{print $2}')
+          if [ "$RAM" -ge 8 ]; then MODEL="llama3.1:8b"
+          elif [ "$RAM" -ge 6 ]; then MODEL="qwen2.5:7b"
+          elif [ "$RAM" -ge 4 ]; then MODEL="phi3:mini"
+          else MODEL="tinyllama"; fi
           ollama pull "$MODEL" || true
 
-          # Also pull an embedding model
-          echo "Downloading embedding model..."
-          ollama pull nomic-embed-text || true
-
-          # ============================================
-          # DONE
-          # ============================================
           touch "$MARKER"
-          echo ""
-          echo "$(date): Y7 OS first boot setup complete!"
-          echo ""
-          echo "Installed tools:"
-          echo "  - Ollama + LocalAI + llama.cpp"
-          echo "  - Claude Code, Gemini CLI, Copilot CLI, Codex CLI"
-          echo "  - OpenCode, OpenClaw, Aider, Open Interpreter"
-          echo "  - Shell-GPT, Fabric, Mods, LLM, aicommits, Goose"
-          echo "  - Hugging Face stack (transformers, datasets, peft, trl)"
-          echo "  - Unsloth, Axolotl, LLaMA-Factory"
-          echo "  - LangChain, LlamaIndex, AutoGen, CrewAI"
-          echo "  - ChromaDB, Qdrant, Whisper, Gradio, Streamlit"
-          echo "  - Open WebUI (port 3000)"
-          echo ""
-          echo "Run 'y7-status' to see system info."
-          echo "Run 'y7-ai' to start chatting."
           SCRIPT
           chmod +x config/includes.chroot/usr/local/bin/y7-first-boot
 
-          # Create systemd service for first boot
-          cat > config/includes.chroot/etc/systemd/system/y7-first-boot.service << 'SERVICE'
+          cat > config/includes.chroot/etc/systemd/system/y7-first-boot.service << 'SVC'
           [Unit]
-          Description=Y7 OS First Boot Setup (94+ AI Tools)
-          After=network-online.target docker.service
+          Description=Y7 OS First Boot
+          After=network-online.target
           Wants=network-online.target
-          ConditionPathExists=!/var/lib/y7os/.first-boot-done
+          ConditionPathExists=!/var/lib/y7os/.done
 
           [Service]
           Type=oneshot
           ExecStart=/usr/local/bin/y7-first-boot
           RemainAfterExit=yes
-          TimeoutStartSec=3600
-          StandardOutput=journal
-          StandardError=journal
+          TimeoutStartSec=1800
 
           [Install]
           WantedBy=multi-user.target
-          SERVICE
+          SVC
 
-      - name: Add MOTD and branding
+          # Enable in hook
+          echo "systemctl enable y7-first-boot.service || true" >> config/hooks/live/9000-y7os.hook.chroot
+
+      - name: Add MOTD
         run: |
           cd build
           mkdir -p config/includes.chroot/etc
 
           cat > config/includes.chroot/etc/motd << 'MOTD'
 
-          ██╗   ██╗███████╗     ██████╗ ███████╗
-          ╚██╗ ██╔╝╚════██║    ██╔═══██╗██╔════╝
-           ╚████╔╝     ██╔╝    ██║   ██║███████╗
-            ╚██╔╝     ██╔╝     ██║   ██║╚════██║
-             ██║      ██║      ╚██████╔╝███████║
-             ╚═╝      ╚═╝       ╚═════╝ ╚══════╝
-
-           AI Stack for Linux — 94+ tools, runs on any hardware
+           Y7 OS — AI Stack for Linux
            مكدس الذكاء الاصطناعي للينكس
 
-           Commands: y7-ai | y7-models | y7-status | y7-install
-           Web UI:   http://localhost:3000 (Open WebUI)
-           Docs:     https://github.com/yahyasaqban-lab/y7os
+           Commands: y7-ai | y7-models | y7-status
+           Web UI:   http://localhost:3000
 
           MOTD
 
           cat > config/includes.chroot/etc/issue << 'ISSUE'
-          Y7 OS - AI Stack for Linux (94+ tools)
-
-          Default login: y7 / y7
-
-          First boot installs all AI tools automatically.
-          Check progress: journalctl -u y7-first-boot -f
+          Y7 OS - AI Stack for Linux
+          Login: y7 / y7
 
           ISSUE
 
       - name: Build ISO
         run: |
           cd build
-          sudo lb build 2>&1 | tee build.log
+          lb build 2>&1 | tee build.log
+          ls -la
 
-          # Rename ISO with version
+      - name: Move ISO
+        run: |
+          cd build
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso ../y7os-${{ steps.version.outputs.version }}-amd64.iso
+            echo "ISO created successfully!"
+          else
+            echo "ISO not found, checking for other files..."
+            find . -name "*.iso" -o -name "*.img" 2>/dev/null
           fi
 
       - name: Generate checksums
         run: |
           if [ -f y7os-${{ steps.version.outputs.version }}-amd64.iso ]; then
             sha256sum y7os-${{ steps.version.outputs.version }}-amd64.iso > y7os-${{ steps.version.outputs.version }}-amd64.iso.sha256
-            md5sum y7os-${{ steps.version.outputs.version }}-amd64.iso > y7os-${{ steps.version.outputs.version }}-amd64.iso.md5
+            ls -lh y7os-*
           fi
 
       - name: Upload ISO artifact
@@ -796,8 +286,8 @@ jobs:
           path: |
             y7os-${{ steps.version.outputs.version }}-amd64.iso
             y7os-${{ steps.version.outputs.version }}-amd64.iso.sha256
-            y7os-${{ steps.version.outputs.version }}-amd64.iso.md5
           retention-days: 30
+          if-no-files-found: warn
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -806,151 +296,29 @@ jobs:
           files: |
             y7os-${{ steps.version.outputs.version }}-amd64.iso
             y7os-${{ steps.version.outputs.version }}-amd64.iso.sha256
-            y7os-${{ steps.version.outputs.version }}-amd64.iso.md5
           body: |
             ## Y7 OS v${{ steps.version.outputs.version }}
 
-            **AI Stack for Linux — 94+ tools, runs on any hardware**
-            مكدس الذكاء الاصطناعي للينكس
+            **AI Stack for Linux — runs on any hardware**
 
             ### Quick Start
             1. Download the ISO
             2. Flash to USB: `sudo dd if=y7os-*.iso of=/dev/sdX bs=4M status=progress`
             3. Boot and login: `y7` / `y7`
-            4. Wait for first-boot setup (installs all AI tools)
-            5. Run: `y7-ai` or open http://localhost:3000
+            4. Run: `y7-ai`
 
-            ### What's Included (94+ tools)
-
-            **🧠 AI Engines:** Ollama, llama.cpp, LocalAI, Open WebUI
-
-            **🤖 AI CLIs:** Claude Code, Gemini CLI, Copilot CLI, Codex CLI, OpenCode, OpenClaw, Aider, Open Interpreter, Shell-GPT, Fabric, Mods, LLM, aicommits, Goose
-
-            **🤗 Hugging Face:** transformers, datasets, accelerate, peft, trl, sentence-transformers
-
-            **🎓 Fine-Tuning:** Unsloth, Axolotl, LLaMA-Factory
-
-            **📦 AI Frameworks:** LangChain, LlamaIndex, AutoGen, CrewAI, Gradio, Streamlit
-
-            **🔧 Dev Tools:** ripgrep, fd, fzf, bat, exa, tmux, lazygit, lazydocker, btop
-
-            **🖼️ Media:** ffmpeg, imagemagick, yt-dlp, tesseract, EasyOCR, Whisper
-
-            **📊 Data:** pandas, numpy, matplotlib, plotly, duckdb, chromadb, qdrant
-
-            **🔐 Security:** gpg, age, wireguard, tor, ufw, fail2ban
-
-            **🐳 Infra:** Docker, Podman, nginx, certbot, PM2
-
-            ### On-demand tools (`y7-install <tool>`)
-            vLLM, LibreChat, text-generation-webui, AnythingLLM, PrivateGPT, Tabby, JupyterLab, and more
+            ### Included
+            - Debian Bookworm base
+            - Ollama (first boot install)
+            - Open WebUI
+            - Docker
+            - y7-ai, y7-models, y7-status
 
             ### Requirements
-            - 4GB RAM minimum (8GB+ recommended)
-            - 20GB disk space
-            - Internet connection for first-boot setup
-
-            ### Checksums
-            ```
-            SHA256: $(cat y7os-${{ steps.version.outputs.version }}-amd64.iso.sha256 | cut -d' ' -f1)
-            ```
+            - 4GB RAM minimum
+            - 20GB disk
+            - Internet for first boot
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-arm64:
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set version
-        id: version
-        run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Set up QEMU for ARM64
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            live-build \
-            debootstrap \
-            qemu-user-static \
-            binfmt-support \
-            squashfs-tools \
-            xorriso \
-            debian-archive-keyring
-
-      - name: Build ARM64 ISO
-        run: |
-          mkdir -p build-arm64 && cd build-arm64
-
-          lb config \
-            --mode debian \
-            --distribution bookworm \
-            --parent-distribution bookworm \
-            --architectures arm64 \
-            --parent-mirror-bootstrap "http://deb.debian.org/debian" \
-            --parent-mirror-chroot "http://deb.debian.org/debian" \
-            --parent-mirror-binary "http://deb.debian.org/debian" \
-            --archive-areas "main contrib non-free-firmware" \
-            --mirror-bootstrap "http://deb.debian.org/debian" \
-            --mirror-chroot "http://deb.debian.org/debian" \
-            --mirror-binary "http://deb.debian.org/debian" \
-            --mirror-chroot-security "none" \
-            --mirror-binary-security "none" \
-            --security false \
-            --debian-installer none \
-            --binary-images iso-hybrid \
-            --iso-application "Y7 OS ARM64" \
-            --iso-volume "Y7OS-${{ steps.version.outputs.version }}-arm64" \
-            --bootstrap-qemu-arch arm64 \
-            --bootstrap-qemu-static /usr/bin/qemu-aarch64-static
-
-          # Package list for ARM64
-          mkdir -p config/package-lists
-          cat > config/package-lists/y7os.list.chroot << 'EOF'
-          linux-image-arm64
-          live-boot
-          systemd-sysv
-          network-manager
-          curl wget ca-certificates gnupg
-          docker.io docker-compose
-          git htop btop zram-tools sudo locales
-          bash-completion nano vim tmux
-          python3 python3-pip python3-venv
-          ripgrep fzf
-          ffmpeg imagemagick
-          EOF
-
-          # Copy tools
-          mkdir -p config/includes.chroot/usr/local/bin
-          cp ../tools/y7-* config/includes.chroot/usr/local/bin/ || true
-          chmod +x config/includes.chroot/usr/local/bin/y7-* || true
-
-          sudo lb build 2>&1 | tee build.log
-
-          if [ -f live-image-arm64.hybrid.iso ]; then
-            mv live-image-arm64.hybrid.iso ../y7os-${{ steps.version.outputs.version }}-arm64.iso
-            sha256sum ../y7os-${{ steps.version.outputs.version }}-arm64.iso > ../y7os-${{ steps.version.outputs.version }}-arm64.iso.sha256
-          fi
-
-      - name: Upload ARM64 to Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            y7os-${{ steps.version.outputs.version }}-arm64.iso
-            y7os-${{ steps.version.outputs.version }}-arm64.iso.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
