@@ -77,7 +77,7 @@ jobs:
           if [ "${{ matrix.arch }}" = "amd64" ]; then
             apt-get install -y grub-pc-bin grub-efi-amd64-bin
           else
-            apt-get install -y grub-efi-arm64-bin
+            apt-get install -y grub-efi-arm64
           fi
 
       - name: Create live-build config
@@ -784,7 +784,7 @@ jobs:
             | Architecture | Download | Use Case |
             |--------------|----------|----------|
             | **AMD64** | `y7os-*-amd64.iso` | Intel/AMD PCs, most laptops |
-            | **ARM64** | `y7os-*-arm64.iso` | Raspberry Pi 4/5, Pine64 |
+            | **ARM64** | `y7os-*-arm64.iso` | Raspberry Pi 4/5, Mac M1/M2/M3 (UTM), Pine64 |
 
             ### Quick Start
             1. Flash to USB: `sudo dd if=y7os-*.iso of=/dev/sdX bs=4M status=progress`
