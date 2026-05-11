@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="url(#grad1)" opacity="0.1"/>
+
+  <!-- Main hexagon shape representing AI/tech -->
+  <path d="M100 20 L165 55 L165 125 L100 160 L35 125 L35 55 Z"
+        fill="none"
+        stroke="url(#grad1)"
+        stroke-width="4"/>
+
+  <!-- Y7 Text -->
+  <text x="100" y="95"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="48"
+        font-weight="700"
+        fill="url(#grad2)"
+        text-anchor="middle">Y7</text>
+
+  <!-- OS subtitle -->
+  <text x="100" y="125"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-size="20"
+        font-weight="500"
+        fill="#6366f1"
+        text-anchor="middle">OS</text>
+
+  <!-- AI neural dots -->
+  <circle cx="50" cy="70" r="4" fill="#22d3ee"/>
+  <circle cx="150" cy="70" r="4" fill="#22d3ee"/>
+  <circle cx="50" cy="130" r="4" fill="#8b5cf6"/>
+  <circle cx="150" cy="130" r="4" fill="#8b5cf6"/>
+
+  <!-- Connection lines -->
+  <line x1="50" y1="70" x2="70" y2="85" stroke="#22d3ee" stroke-width="1" opacity="0.5"/>
+  <line x1="150" y1="70" x2="130" y2="85" stroke="#22d3ee" stroke-width="1" opacity="0.5"/>
+  <line x1="50" y1="130" x2="70" y2="115" stroke="#8b5cf6" stroke-width="1" opacity="0.5"/>
+  <line x1="150" y1="130" x2="130" y2="115" stroke="#8b5cf6" stroke-width="1" opacity="0.5"/>
+</svg>

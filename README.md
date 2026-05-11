@@ -1,122 +1,217 @@
-<div align="center">
+<p align="center">
+  <img src="branding/y7os-logo.svg" alt="Y7 OS" width="200"/>
+</p>
 
-<h1>Y7 OS</h1>
+<h1 align="center">Y7 OS</h1>
 
-<p><strong>AI Stack for Linux — runs on any hardware</strong><br/>
-<em>مكدس الذكاء الاصطناعي للينكس</em></p>
+<p align="center">
+  <strong>AI Stack for Linux — runs on any hardware</strong><br/>
+  <em>مكدس الذكاء الاصطناعي للينكس — يعمل على أي جهاز</em>
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.1.0-green.svg)]()
-[![Platform](https://img.shields.io/badge/Platform-Ubuntu%20%7C%20Debian-orange.svg)]()
+<p align="center">
+  <a href="https://github.com/yahyasaqban-lab/y7os/releases/latest"><img src="https://img.shields.io/github/v/release/yahyasaqban-lab/y7os?style=flat-square&color=blue" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
+  <a href="https://github.com/yahyasaqban-lab/y7os/stargazers"><img src="https://img.shields.io/github/stars/yahyasaqban-lab/y7os?style=flat-square" alt="Stars"></a>
+  <a href="https://y7os.dev"><img src="https://img.shields.io/badge/Website-y7os.dev-purple?style=flat-square" alt="Website"></a>
+</p>
 
-</div>
+<p align="center">
+  <a href="#download">Download</a> •
+  <a href="#features">Features</a> •
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#documentation">Docs</a> •
+  <a href="#roadmap">Roadmap</a>
+</p>
 
 ---
 
-## Quick Install
+## What is Y7 OS?
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | bash
+Y7 OS is a **Linux distribution built for local AI**. It turns any computer — even old laptops with 4GB RAM — into a private AI workstation. No cloud. No subscriptions. No data leaving your device.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Y7 OS v0.2.6                                               │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Ollama    │  │  Open WebUI │  │   Docker    │         │
+│  │  (LLMs)     │  │  (Chat UI)  │  │ (Containers)│         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                                                             │
+│  ┌─────────────────────────────────────────────────┐       │
+│  │  y7-ai  │  y7-models  │  y7-status  │  y7-bench │       │
+│  └─────────────────────────────────────────────────┘       │
+│                                                             │
+│  ┌─────────────────────────────────────────────────┐       │
+│  │              Debian Bookworm Base               │       │
+│  └─────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**What it does:**
-- Installs Ollama (local AI inference)
-- Sets up Docker + Open WebUI
-- Configures ZRAM (compressed swap)
-- Downloads the best AI model for your RAM
-- Installs y7 tools (y7-ai, y7-models, y7-status)
+---
+
+## Download
+
+### Latest Release: v0.2.6
+
+| Architecture | Download | Size |
+|--------------|----------|------|
+| **AMD64** (Intel/AMD) | [y7os-0.2.6-amd64.iso](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.2.6/y7os-0.2.6-amd64.iso) | 982 MB |
+
+**Checksum:** [SHA256](https://github.com/yahyasaqban-lab/y7os/releases/download/v0.2.6/y7os-0.2.6-amd64.iso.sha256)
+
+### Flash to USB
+
+```bash
+# Linux/macOS
+sudo dd if=y7os-0.2.6-amd64.iso of=/dev/sdX bs=4M status=progress
+
+# Or use Balena Etcher, Rufus, Ventoy
+```
 
 ---
 
-## Requirements
+## Features
 
-| Minimum | Recommended |
-|---------|-------------|
-| Ubuntu/Debian | Ubuntu 22.04+ |
-| 4 GB RAM | 8 GB RAM |
-| 10 GB disk | 20 GB disk |
-| Internet | Internet |
+### Pre-installed AI Stack
+- **Ollama** — Run LLMs locally (Llama, Mistral, Qwen, Phi)
+- **Open WebUI** — ChatGPT-like interface at `localhost:3000`
+- **Docker** — Container runtime for AI tools
+- **y7 Tools** — CLI tools for AI management
+
+### Optimized for Low Resources
+- **4GB RAM minimum** — runs on old laptops
+- **ZRAM enabled** — compressed swap for better performance
+- **Auto model selection** — picks the best model for your RAM
+
+### Privacy First
+- **100% local** — no data leaves your device
+- **No accounts required** — no sign-ups, no tracking
+- **Offline capable** — works without internet after setup
+
+### Arabic + English Native
+- **Full Arabic support** — RTL, locales, keyboard
+- **Bilingual tools** — `y7-ai --lang ar`
 
 ---
 
-## Tools
+## Quick Start
 
-### y7-ai
-Intelligent AI launcher — detects your RAM and picks the best model.
+### 1. Boot & Login
+```
+Username: y7
+Password: y7
+```
 
+### 2. Start Chatting
 ```bash
 y7-ai                      # Interactive chat
-y7-ai "explain bash"       # Single prompt
-cat code.py | y7-ai        # Pipe input
-y7-ai --model mistral      # Use specific model
-y7-ai --lang ar            # Arabic mode
+y7-ai "explain kubernetes" # Single question
 ```
 
-### y7-models
-Manage AI models — download, switch, delete, recommend.
-
-```bash
-y7-models list             # Show downloaded models
-y7-models recommend        # Best model for your RAM
-y7-models download phi3    # Download a model
-y7-models available        # Browse all models
+### 3. Open Web UI
+```
+http://localhost:3000
 ```
 
-### y7-status
-System dashboard — RAM, CPU, disk, Ollama status.
-
+### 4. Manage Models
 ```bash
-y7-status                  # Show dashboard
-y7-status --lang ar        # Arabic
+y7-models list            # Show downloaded models
+y7-models recommend       # Best model for your RAM
+y7-models download phi3   # Download a model
+```
+
+### 5. System Status
+```bash
+y7-status                 # Dashboard
+y7-bench                  # Benchmark your system
 ```
 
 ---
 
-## Model Guide
+## System Requirements
 
-| Model | RAM | Best for |
-|-------|-----|----------|
-| tinyllama | 2 GB | Ultra-low RAM |
-| gemma:2b | 3 GB | Fast responses |
-| phi3:mini | 4 GB | Best quality/size ratio |
-| mistral:7b-q4 | 6 GB | General purpose |
-| qwen2:7b | 6 GB | Best Arabic support |
-| llama3.1:8b | 8 GB | Best quality |
+| Spec | Minimum | Recommended |
+|------|---------|-------------|
+| **RAM** | 4 GB | 8 GB+ |
+| **Storage** | 20 GB | 50 GB+ |
+| **CPU** | 64-bit x86 | 4+ cores |
+| **Internet** | Required for first boot | Optional after setup |
+
+### Model RAM Guide
+
+| Model | RAM Required | Quality |
+|-------|--------------|---------|
+| TinyLlama | 2 GB | Basic |
+| Phi-3 Mini | 4 GB | Good |
+| Qwen 2.5 7B | 6 GB | Great (Arabic) |
+| Llama 3.1 8B | 8 GB | Best |
 
 ---
 
-## v0.1.0 Release Notes
+## Documentation
 
-First working release:
-- y7-install works on Ubuntu/Debian
-- y7-ai, y7-models, y7-status tools
-- Ollama + Docker + Open WebUI setup
-- ZRAM auto-configuration
-- Arabic language support (--lang ar)
+- [Installation Guide](docs/guides/installation.md)
+- [Getting Started](docs/guides/getting-started.md)
+- [Model Guide](docs/models.md)
+- [CLI Reference](docs/guides/cli-reference.md)
+- [Architecture](docs/architecture.md)
+- [FAQ](docs/guides/faq.md)
+
+---
+
+## Roadmap
+
+### v0.3.0 — Q2 2026
+- [ ] ARM64 support (Raspberry Pi, Apple Silicon)
+- [ ] GPU acceleration (NVIDIA, AMD)
+- [ ] Persistence mode for live USB
+- [ ] Auto-update system
+
+### v0.4.0 — Q3 2026
+- [ ] Fine-tuning tools (Unsloth, Axolotl)
+- [ ] RAG pipeline (ChromaDB, LlamaIndex)
+- [ ] Voice interface (Whisper, TTS)
+- [ ] Mobile companion app
+
+### v1.0.0 — Q4 2026
+- [ ] Stable release
+- [ ] Enterprise support
+- [ ] Certified hardware partners
+
+See [ROADMAP.md](ROADMAP.md) for details.
 
 ---
 
 ## العربية
 
-### التثبيت السريع
+### التحميل
+
+قم بتحميل ملف ISO من [صفحة الإصدارات](https://github.com/yahyasaqban-lab/y7os/releases/latest)
+
+### البدء السريع
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | bash
-```
+# تسجيل الدخول
+المستخدم: y7
+كلمة المرور: y7
 
-### الأدوات
+# محادثة بالعربية
+y7-ai --lang ar
 
-```bash
-y7-ai --lang ar            # محادثة بالعربية
-y7-status --lang ar        # لوحة الحالة
-y7-models recommend        # أفضل نموذج لجهازك
+# لوحة الحالة
+y7-status --lang ar
+
+# أفضل نموذج لجهازك
+y7-models recommend
 ```
 
 ### النماذج المدعومة للعربية
 
 | النموذج | الذاكرة | جودة العربية |
 |---------|---------|--------------|
-| qwen2:7b | 6 GB | ممتازة |
+| qwen2.5:7b | 6 GB | ممتازة |
 | llama3.1:8b | 8 GB | جيدة جداً |
 | phi3:mini | 4 GB | جيدة |
 
@@ -124,35 +219,35 @@ y7-models recommend        # أفضل نموذج لجهازك
 
 ## Contributing
 
-See [docs/contributing.md](docs/contributing.md)
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+```bash
+git clone https://github.com/yahyasaqban-lab/y7os.git
+cd y7os
+make build
+```
+
+---
+
+## Community
+
+- **Website:** [y7os.dev](https://y7os.dev)
+- **GitHub:** [github.com/yahyasaqban-lab/y7os](https://github.com/yahyasaqban-lab/y7os)
+- **Twitter/X:** [@y7os_ai](https://twitter.com/y7os_ai)
+
+---
 
 ## License
 
-MIT — free forever
+MIT License — free forever. See [LICENSE](LICENSE).
 
 ---
 
-<div align="center">
+<p align="center">
+  <strong>Built by <a href="https://github.com/yahyasaqban">Yahya Saqban</a> — Kuwait 🇰🇼</strong><br/>
+  <em>For everyone who deserves access to AI</em>
+</p>
 
-**Built by Yahya — For everyone**
-
-<div align="center">
-
-**Built by Yahya — For everyone**
-
-[Issues](https://github.com/yahyasaqban-lab/y7os/issues) · [Docs](docs/)
-
----
-
-## 🤖 Contributors
-
-| | |
-|---|---|
-| 🧠 **DeepSeek AI** | Signal generation & trading models |
-| 🐉 **Claude (Anthropic)** | Agent orchestration & automation |
-
----
-
-*Y7 OS is an AI-first Linux distro — built with AI, for everyone.*
-
-</div>
+<p align="center">
+  🧠 <strong>AI Contributors:</strong> DeepSeek AI • Claude (Anthropic)
+</p>
