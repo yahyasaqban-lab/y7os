@@ -749,7 +749,7 @@ jobs:
   create-release:
     needs: build-iso
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && contains(join(needs.*.result, ','), 'success')
 
     steps:
       - name: Download all artifacts
