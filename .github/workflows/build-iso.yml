@@ -66,7 +66,6 @@ jobs:
             --mirror-chroot-security "http://deb.debian.org/debian-security" \
             --mirror-binary-security "http://deb.debian.org/debian-security" \
             --security true \
-            --updates true \
             --debian-installer none \
             --binary-images iso-hybrid \
             --iso-application "Y7 OS" \
@@ -901,7 +900,6 @@ jobs:
             --mirror-chroot-security "http://deb.debian.org/debian-security" \
             --mirror-binary-security "http://deb.debian.org/debian-security" \
             --security true \
-            --updates true \
             --debian-installer none \
             --binary-images iso-hybrid \
             --iso-application "Y7 OS ARM64" \
