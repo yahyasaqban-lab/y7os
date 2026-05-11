@@ -136,6 +136,23 @@ MIT — free forever
 
 **Built by Yahya — For everyone**
 
+<div align="center">
+
+**Built by Yahya — For everyone**
+
 [Issues](https://github.com/yahyasaqban-lab/y7os/issues) · [Docs](docs/)
+
+---
+
+## 🤖 Contributors
+
+| | |
+|---|---|
+| 🧠 **DeepSeek AI** | Signal generation & trading models |
+| 🐉 **Claude (Anthropic)** | Agent orchestration & automation |
+
+---
+
+*Y7 OS is an AI-first Linux distro — built with AI, for everyone.*
 
 </div>
