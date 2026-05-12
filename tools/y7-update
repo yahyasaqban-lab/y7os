@@ -1,0 +1,220 @@
+#!/bin/bash
+set -e
+
+VERSION="1.0.0"
+LANG="${Y7_LANG:-en}"
+REPO="yahyasaqban-lab/y7os"
+UPDATE_URL="https://raw.githubusercontent.com/$REPO/main/tools"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+msg() { echo -e "${GREEN}[y7-update]${NC} $1"; }
+warn() { echo -e "${YELLOW}[warning]${NC} $1"; }
+error() { echo -e "${RED}[error]${NC} $1"; exit 1; }
+
+show_help() {
+    if [ "$LANG" = "ar" ]; then
+        cat << 'EOF'
+y7-update — تحديث نظام Y7 OS
+
+الاستخدام:
+  y7-update [أمر]
+
+الأوامر:
+  check       التحقق من التحديثات المتاحة
+  tools       تحديث أدوات y7-*
+  models      تحديث نماذج Ollama
+  system      تحديث حزم النظام
+  all         تحديث كل شيء
+  --help      عرض المساعدة
+
+أمثلة:
+  y7-update check
+  y7-update tools
+  y7-update all
+EOF
+    else
+        cat << 'EOF'
+y7-update — Update Y7 OS system
+
+Usage:
+  y7-update [command]
+
+Commands:
+  check       Check for available updates
+  tools       Update y7-* CLI tools
+  models      Update Ollama models
+  system      Update system packages
+  all         Update everything
+  --help      Show this help
+
+Examples:
+  y7-update check
+  y7-update tools
+  y7-update all
+EOF
+    fi
+}
+
+check_updates() {
+    msg "Checking for updates..."
+
+    echo ""
+    echo "=== Y7 Tools ==="
+
+    # Check each tool
+    for tool in y7-ai y7-models y7-status y7-gpu y7-persist y7-update y7-backup y7-rag y7-voice y7-serve; do
+        if [ -f "/usr/local/bin/$tool" ]; then
+            LOCAL_VER=$(grep "^VERSION=" "/usr/local/bin/$tool" 2>/dev/null | cut -d'"' -f2 || echo "unknown")
+            echo "  $tool: v$LOCAL_VER (installed)"
+        fi
+    done
+
+    echo ""
+    echo "=== Ollama ==="
+    if command -v ollama &>/dev/null; then
+        OLLAMA_VER=$(ollama --version 2>/dev/null | head -1 || echo "unknown")
+        echo "  Version: $OLLAMA_VER"
+    else
+        echo "  Not installed"
+    fi
+
+    echo ""
+    echo "=== System ==="
+    if command -v apt &>/dev/null; then
+        UPDATES=$(apt list --upgradable 2>/dev/null | grep -c upgradable || echo "0")
+        echo "  $UPDATES package(s) can be upgraded"
+    fi
+
+    echo ""
+    msg "Run 'y7-update all' to update everything"
+}
+
+update_tools() {
+    msg "Updating Y7 tools..."
+
+    TOOLS="y7-ai y7-models y7-status y7-gpu y7-persist y7-update y7-backup y7-rag y7-voice y7-serve"
+
+    for tool in $TOOLS; do
+        echo -n "  Updating $tool... "
+        if curl -fsSL "$UPDATE_URL/$tool" -o "/tmp/$tool" 2>/dev/null; then
+            if [ -s "/tmp/$tool" ]; then
+                sudo mv "/tmp/$tool" "/usr/local/bin/$tool"
+                sudo chmod +x "/usr/local/bin/$tool"
+                echo -e "${GREEN}✓${NC}"
+            else
+                echo -e "${YELLOW}skipped (empty)${NC}"
+            fi
+        else
+            echo -e "${YELLOW}skipped (not found)${NC}"
+        fi
+    done
+
+    msg "Tools updated!"
+}
+
+update_models() {
+    msg "Updating Ollama models..."
+
+    if ! command -v ollama &>/dev/null; then
+        warn "Ollama not installed"
+        return 1
+    fi
+
+    # Get list of installed models
+    MODELS=$(ollama list 2>/dev/null | tail -n +2 | awk '{print $1}')
+
+    if [ -z "$MODELS" ]; then
+        warn "No models installed"
+        return 0
+    fi
+
+    for model in $MODELS; do
+        echo "  Updating $model..."
+        ollama pull "$model" || warn "Failed to update $model"
+    done
+
+    msg "Models updated!"
+}
+
+update_system() {
+    msg "Updating system packages..."
+
+    if command -v apt &>/dev/null; then
+        sudo apt update
+        sudo apt upgrade -y
+        sudo apt autoremove -y
+    elif command -v dnf &>/dev/null; then
+        sudo dnf upgrade -y
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -Syu --noconfirm
+    else
+        warn "Unknown package manager"
+        return 1
+    fi
+
+    msg "System updated!"
+}
+
+update_ollama() {
+    msg "Updating Ollama..."
+
+    curl -fsSL https://ollama.com/install.sh | sh
+
+    msg "Ollama updated!"
+}
+
+update_all() {
+    msg "Updating everything..."
+    echo ""
+
+    update_tools
+    echo ""
+
+    update_ollama
+    echo ""
+
+    update_models
+    echo ""
+
+    update_system
+    echo ""
+
+    msg "All updates complete!"
+}
+
+# Main
+case "${1:-}" in
+    check)
+        check_updates
+        ;;
+    tools)
+        update_tools
+        ;;
+    models)
+        update_models
+        ;;
+    system)
+        update_system
+        ;;
+    ollama)
+        update_ollama
+        ;;
+    all)
+        update_all
+        ;;
+    -h|--help|help)
+        show_help
+        ;;
+    "")
+        check_updates
+        ;;
+    *)
+        error "Unknown command: $1"
+        ;;
+esac

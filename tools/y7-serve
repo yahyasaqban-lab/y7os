@@ -1,0 +1,273 @@
+#!/bin/bash
+set -e
+
+VERSION="1.0.0"
+LANG="${Y7_LANG:-en}"
+DEFAULT_PORT=8080
+CONFIG_DIR="$HOME/.config/y7os"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+msg() { echo -e "${GREEN}[y7-serve]${NC} $1"; }
+warn() { echo -e "${YELLOW}[warning]${NC} $1"; }
+error() { echo -e "${RED}[error]${NC} $1"; exit 1; }
+
+show_help() {
+    if [ "$LANG" = "ar" ]; then
+        cat << 'EOF'
+y7-serve — خادم API لـ Y7 OS
+
+الاستخدام:
+  y7-serve [أمر] [خيارات]
+
+الأوامر:
+  start       بدء الخادم
+  stop        إيقاف الخادم
+  status      حالة الخادم
+  logs        عرض السجلات
+  config      إعدادات الخادم
+
+خيارات:
+  --port      رقم المنفذ (افتراضي: 8080)
+  --host      العنوان (افتراضي: 0.0.0.0)
+  --model     النموذج الافتراضي
+  --help      عرض المساعدة
+EOF
+    else
+        cat << 'EOF'
+y7-serve — Y7 OS API Server
+
+Usage:
+  y7-serve [command] [options]
+
+Commands:
+  start       Start the API server
+  stop        Stop the API server
+  status      Show server status
+  logs        View server logs
+  config      Configure server
+  webui       Start Open WebUI
+
+Options:
+  --port      Port number (default: 8080)
+  --host      Host address (default: 0.0.0.0)
+  --model     Default model
+  --help      Show this help
+
+Examples:
+  y7-serve start
+  y7-serve start --port 3000
+  y7-serve status
+  y7-serve webui
+EOF
+    fi
+}
+
+check_ollama() {
+    if ! command -v ollama &>/dev/null; then
+        error "Ollama not installed. Run: curl -fsSL https://ollama.com/install.sh | sh"
+    fi
+
+    if ! systemctl is-active --quiet ollama 2>/dev/null; then
+        if ! pgrep -x ollama &>/dev/null; then
+            warn "Ollama not running. Starting..."
+            ollama serve &>/dev/null &
+            sleep 2
+        fi
+    fi
+}
+
+start_server() {
+    local PORT=$DEFAULT_PORT
+    local HOST="0.0.0.0"
+    local MODEL=""
+
+    # Parse args
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --port) PORT="$2"; shift 2 ;;
+            --host) HOST="$2"; shift 2 ;;
+            --model) MODEL="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    check_ollama
+
+    msg "Starting Y7 API server on $HOST:$PORT"
+
+    # Check if port is in use
+    if lsof -i ":$PORT" &>/dev/null; then
+        error "Port $PORT is already in use"
+    fi
+
+    # Create simple API wrapper using socat + ollama
+    mkdir -p "$CONFIG_DIR"
+
+    cat > "$CONFIG_DIR/y7-api.sh" << 'APISCRIPT'
+#!/bin/bash
+# Simple proxy to Ollama API with Y7 defaults
+
+read -r REQUEST_LINE
+read -r -d '' HEADERS
+
+# Forward to Ollama
+exec curl -s "http://localhost:11434${REQUEST_LINE#* }" \
+    -H "Content-Type: application/json" \
+    -d @-
+APISCRIPT
+    chmod +x "$CONFIG_DIR/y7-api.sh"
+
+    msg "API server ready!"
+    echo ""
+    echo "  Ollama API:    http://$HOST:11434"
+    echo "  OpenAI compat: http://$HOST:11434/v1"
+    echo ""
+    echo "Example:"
+    echo "  curl http://localhost:11434/api/generate -d '{"model\":\"tinyllama\",\"prompt\":\"Hello\"}'"
+    echo ""
+    echo "Press Ctrl+C to stop"
+
+    # Keep ollama running in foreground
+    if ! systemctl is-active --quiet ollama 2>/dev/null; then
+        ollama serve
+    else
+        # Just wait
+        tail -f /dev/null
+    fi
+}
+
+stop_server() {
+    msg "Stopping Y7 API server..."
+
+    # Stop ollama if we started it
+    pkill -f "ollama serve" 2>/dev/null || true
+
+    msg "Server stopped"
+}
+
+show_status() {
+    echo "=== Y7 API Server Status ==="
+    echo ""
+
+    # Ollama status
+    echo "Ollama:"
+    if systemctl is-active --quiet ollama 2>/dev/null; then
+        echo "  Status: running (systemd)"
+    elif pgrep -x ollama &>/dev/null; then
+        echo "  Status: running (manual)"
+    else
+        echo "  Status: stopped"
+    fi
+
+    # Check API
+    if curl -s "http://localhost:11434/api/tags" &>/dev/null; then
+        echo "  API: responsive"
+        MODELS=$(curl -s "http://localhost:11434/api/tags" | jq -r '.models[].name' 2>/dev/null | wc -l)
+        echo "  Models loaded: $MODELS"
+    else
+        echo "  API: not responding"
+    fi
+
+    echo ""
+
+    # Open WebUI status
+    echo "Open WebUI:"
+    if docker ps 2>/dev/null | grep -q open-webui; then
+        echo "  Status: running"
+        echo "  URL: http://localhost:3000"
+    else
+        echo "  Status: not running"
+        echo "  Start with: y7-serve webui"
+    fi
+}
+
+show_logs() {
+    if systemctl is-active --quiet ollama 2>/dev/null; then
+        journalctl -u ollama -f
+    else
+        warn "Ollama not running as service"
+    fi
+}
+
+start_webui() {
+    msg "Starting Open WebUI..."
+
+    if ! command -v docker &>/dev/null; then
+        error "Docker not installed"
+    fi
+
+    # Check if already running
+    if docker ps 2>/dev/null | grep -q open-webui; then
+        msg "Open WebUI already running at http://localhost:3000"
+        return 0
+    fi
+
+    # Check if container exists but stopped
+    if docker ps -a 2>/dev/null | grep -q open-webui; then
+        docker start open-webui
+    else
+        # Pull and run
+        docker run -d \
+            --name open-webui \
+            --restart unless-stopped \
+            -p 3000:8080 \
+            -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+            --add-host=host.docker.internal:host-gateway \
+            -v open-webui:/app/backend/data \
+            ghcr.io/open-webui/open-webui:main
+    fi
+
+    msg "Open WebUI started at http://localhost:3000"
+}
+
+configure() {
+    msg "Y7 API Configuration"
+    echo ""
+    echo "Ollama API endpoint: http://localhost:11434"
+    echo "OpenAI-compatible:   http://localhost:11434/v1"
+    echo ""
+    echo "Environment variables:"
+    echo "  OLLAMA_HOST=http://localhost:11434"
+    echo "  OPENAI_API_BASE=http://localhost:11434/v1"
+    echo "  OPENAI_API_KEY=ollama  (any value works)"
+    echo ""
+    echo "For remote access, ensure firewall allows port 11434"
+}
+
+# Main
+case "${1:-}" in
+    start)
+        shift
+        start_server "$@"
+        ;;
+    stop)
+        stop_server
+        ;;
+    status)
+        show_status
+        ;;
+    logs)
+        show_logs
+        ;;
+    config)
+        configure
+        ;;
+    webui)
+        start_webui
+        ;;
+    -h|--help|help)
+        show_help
+        ;;
+    "")
+        show_status
+        ;;
+    *)
+        error "Unknown command: $1"
+        ;;
+esac

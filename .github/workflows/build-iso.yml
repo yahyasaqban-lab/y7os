@@ -154,6 +154,10 @@ jobs:
           ufw
           pciutils
           lshw
+          alsa-utils
+          pulseaudio
+          sox
+          espeak-ng
           EOF
 
           # Architecture-specific kernel
@@ -332,33 +336,52 @@ jobs:
           mkdir -p config/includes.chroot/usr/local/bin
           mkdir -p config/includes.chroot/etc/skel
 
-          # Copy y7 tools
-          cp ../tools/y7-ai config/includes.chroot/usr/local/bin/ || true
-          cp ../tools/y7-models config/includes.chroot/usr/local/bin/ || true
-          cp ../tools/y7-status config/includes.chroot/usr/local/bin/ || true
+          # Copy all y7 tools
+          for tool in y7-ai y7-models y7-status y7-update y7-backup y7-serve y7-rag y7-voice; do
+            if [ -f "../tools/$tool" ]; then
+              cp "../tools/$tool" config/includes.chroot/usr/local/bin/
+              echo "Added: $tool"
+            fi
+          done
           chmod +x config/includes.chroot/usr/local/bin/y7-* 2>/dev/null || true
 
-          # Bashrc
+          # Bashrc with all aliases
           cat > config/includes.chroot/etc/skel/.bashrc << 'BASHRC'
           export PATH="$PATH:/usr/local/bin:$HOME/.local/bin"
+
+          # Y7 OS aliases
           alias ai='y7-ai'
           alias models='y7-models'
           alias status='y7-status'
           alias gpu='y7-gpu'
+          alias update='y7-update'
+          alias backup='y7-backup'
+          alias serve='y7-serve'
+          alias rag='y7-rag'
+          alias voice='y7-voice'
 
           if [ ! -f ~/.y7os-welcomed ]; then
             echo ""
             echo "══════════════════════════════════════════════════"
-            echo "  Y7 OS v0.3.0 — AI Stack for Linux"
+            echo "  Y7 OS v0.4.0 — AI Stack for Linux"
             echo "  مرحباً بك في Y7 OS"
             echo "══════════════════════════════════════════════════"
             echo ""
-            echo "  y7-ai       — Chat with AI (TinyLlama ready!)"
-            echo "  y7-models   — Manage models"
-            echo "  y7-status   — System dashboard"
-            echo "  y7-gpu      — GPU detection & drivers"
+            echo "  Core Tools:"
+            echo "    y7-ai       — Chat with AI"
+            echo "    y7-models   — Manage models"
+            echo "    y7-status   — System dashboard"
             echo ""
-            echo "  Persistence: Use 'y7-persist' to save data"
+            echo "  Advanced:"
+            echo "    y7-gpu      — GPU detection & drivers"
+            echo "    y7-rag      — Document Q&A (RAG)"
+            echo "    y7-voice    — Voice interface"
+            echo "    y7-serve    — API server"
+            echo ""
+            echo "  System:"
+            echo "    y7-update   — Update Y7 OS"
+            echo "    y7-backup   — Backup data"
+            echo "    y7-persist  — Persistence setup"
             echo ""
             touch ~/.y7os-welcomed
           fi

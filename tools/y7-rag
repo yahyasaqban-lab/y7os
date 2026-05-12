@@ -1,0 +1,395 @@
+#!/bin/bash
+set -e
+
+VERSION="1.0.0"
+LANG="${Y7_LANG:-en}"
+RAG_DIR="${Y7_RAG_DIR:-$HOME/.y7os/rag}"
+CHROMA_PORT=8000
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+msg() { echo -e "${GREEN}[y7-rag]${NC} $1"; }
+warn() { echo -e "${YELLOW}[warning]${NC} $1"; }
+error() { echo -e "${RED}[error]${NC} $1"; exit 1; }
+
+show_help() {
+    if [ "$LANG" = "ar" ]; then
+        cat << 'EOF'
+y7-rag — نظام الاسترجاع المعزز بالذكاء الاصطناعي
+
+الاستخدام:
+  y7-rag [أمر] [خيارات]
+
+الأوامر:
+  init        تهيئة قاعدة المعرفة
+  add         إضافة مستندات
+  query       استعلام من المستندات
+  list        عرض المستندات المفهرسة
+  remove      حذف مستند
+  start       بدء خادم ChromaDB
+  status      حالة النظام
+
+أمثلة:
+  y7-rag init
+  y7-rag add ./documents/
+  y7-rag query "ما هو الموضوع الرئيسي؟"
+EOF
+    else
+        cat << 'EOF'
+y7-rag — Retrieval Augmented Generation
+
+Usage:
+  y7-rag [command] [options]
+
+Commands:
+  init        Initialize knowledge base
+  add         Add documents to index
+  query       Query your documents with AI
+  list        List indexed documents
+  remove      Remove a document
+  start       Start ChromaDB server
+  stop        Stop ChromaDB server
+  status      Show system status
+
+Options:
+  --collection  Collection name (default: default)
+  --model       Embedding model (default: nomic-embed-text)
+  --help        Show this help
+
+Examples:
+  y7-rag init
+  y7-rag add ./documents/
+  y7-rag add myfile.pdf
+  y7-rag query "What is the main topic?"
+  y7-rag list
+EOF
+    fi
+}
+
+check_deps() {
+    # Check Python
+    if ! command -v python3 &>/dev/null; then
+        error "Python3 not found"
+    fi
+
+    # Check if chromadb is installed
+    if ! python3 -c "import chromadb" 2>/dev/null; then
+        warn "ChromaDB not installed. Installing..."
+        pip3 install chromadb sentence-transformers pypdf docx2txt --quiet
+    fi
+
+    # Check ollama for embeddings
+    if ! command -v ollama &>/dev/null; then
+        warn "Ollama not installed (needed for embeddings)"
+    fi
+}
+
+init_rag() {
+    msg "Initializing RAG system..."
+
+    check_deps
+
+    mkdir -p "$RAG_DIR"
+    mkdir -p "$RAG_DIR/documents"
+    mkdir -p "$RAG_DIR/db"
+
+    # Create Python RAG module
+    cat > "$RAG_DIR/rag_engine.py" << 'PYTHON'
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import chromadb
+from chromadb.config import Settings
+
+RAG_DIR = os.environ.get('Y7_RAG_DIR', os.path.expanduser('~/.y7os/rag'))
+DB_PATH = os.path.join(RAG_DIR, 'db')
+
+def get_client():
+    return chromadb.PersistentClient(path=DB_PATH)
+
+def get_collection(name='default'):
+    client = get_client()
+    return client.get_or_create_collection(name=name)
+
+def add_document(filepath, collection_name='default'):
+    """Add a document to the collection"""
+    collection = get_collection(collection_name)
+
+    # Read file content
+    ext = os.path.splitext(filepath)[1].lower()
+
+    if ext == '.pdf':
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(filepath)
+            content = '\n'.join([page.extract_text() for page in reader.pages])
+        except:
+            content = open(filepath, 'r', errors='ignore').read()
+    elif ext == '.docx':
+        try:
+            import docx2txt
+            content = docx2txt.process(filepath)
+        except:
+            content = open(filepath, 'r', errors='ignore').read()
+    else:
+        content = open(filepath, 'r', errors='ignore').read()
+
+    # Split into chunks
+    chunk_size = 1000
+    chunks = [content[i:i+chunk_size] for i in range(0, len(content), chunk_size)]
+
+    # Add to collection
+    filename = os.path.basename(filepath)
+    ids = [f"{filename}_{i}" for i in range(len(chunks))]
+    metadatas = [{"source": filename, "chunk": i} for i in range(len(chunks))]
+
+    collection.add(
+        documents=chunks,
+        ids=ids,
+        metadatas=metadatas
+    )
+
+    return len(chunks)
+
+def query_documents(query, collection_name='default', n_results=3):
+    """Query the collection"""
+    collection = get_collection(collection_name)
+
+    results = collection.query(
+        query_texts=[query],
+        n_results=n_results
+    )
+
+    return results
+
+def list_documents(collection_name='default'):
+    """List all documents in collection"""
+    collection = get_collection(collection_name)
+    data = collection.get()
+
+    sources = set()
+    for meta in data.get('metadatas', []):
+        if meta and 'source' in meta:
+            sources.add(meta['source'])
+
+    return list(sources)
+
+def remove_document(filename, collection_name='default'):
+    """Remove a document from collection"""
+    collection = get_collection(collection_name)
+    data = collection.get()
+
+    ids_to_remove = []
+    for i, meta in enumerate(data.get('metadatas', [])):
+        if meta and meta.get('source') == filename:
+            ids_to_remove.append(data['ids'][i])
+
+    if ids_to_remove:
+        collection.delete(ids=ids_to_remove)
+
+    return len(ids_to_remove)
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command')
+    parser.add_argument('--file', '-f')
+    parser.add_argument('--query', '-q')
+    parser.add_argument('--collection', '-c', default='default')
+    args = parser.parse_args()
+
+    if args.command == 'add':
+        chunks = add_document(args.file, args.collection)
+        print(json.dumps({"status": "ok", "chunks": chunks}))
+    elif args.command == 'query':
+        results = query_documents(args.query, args.collection)
+        print(json.dumps(results))
+    elif args.command == 'list':
+        docs = list_documents(args.collection)
+        print(json.dumps({"documents": docs}))
+    elif args.command == 'remove':
+        removed = remove_document(args.file, args.collection)
+        print(json.dumps({"status": "ok", "removed": removed}))
+PYTHON
+    chmod +x "$RAG_DIR/rag_engine.py"
+
+    # Pull embedding model
+    msg "Pulling embedding model..."
+    ollama pull nomic-embed-text 2>/dev/null || warn "Could not pull embedding model"
+
+    msg "RAG system initialized at $RAG_DIR"
+}
+
+add_documents() {
+    local TARGET="$1"
+    local COLLECTION="${2:-default}"
+
+    if [ -z "$TARGET" ]; then
+        error "Usage: y7-rag add <file-or-directory>"
+    fi
+
+    check_deps
+
+    if [ -d "$TARGET" ]; then
+        # Add all files in directory
+        msg "Adding documents from: $TARGET"
+        find "$TARGET" -type f \( -name "*.txt" -o -name "*.md" -o -name "*.pdf" -o -name "*.docx" \) | while read -r file; do
+            echo -n "  Adding $(basename "$file")... "
+            RESULT=$(python3 "$RAG_DIR/rag_engine.py" add --file "$file" --collection "$COLLECTION" 2>/dev/null)
+            CHUNKS=$(echo "$RESULT" | jq -r '.chunks' 2>/dev/null || echo "?")
+            echo "$CHUNKS chunks"
+        done
+    elif [ -f "$TARGET" ]; then
+        msg "Adding: $TARGET"
+        RESULT=$(python3 "$RAG_DIR/rag_engine.py" add --file "$TARGET" --collection "$COLLECTION" 2>/dev/null)
+        CHUNKS=$(echo "$RESULT" | jq -r '.chunks' 2>/dev/null || echo "?")
+        msg "Added $CHUNKS chunks"
+    else
+        error "File or directory not found: $TARGET"
+    fi
+}
+
+query_rag() {
+    local QUERY="$1"
+    local COLLECTION="${2:-default}"
+
+    if [ -z "$QUERY" ]; then
+        error "Usage: y7-rag query \"your question\""
+    fi
+
+    check_deps
+
+    msg "Searching knowledge base..."
+
+    # Get relevant documents
+    RESULTS=$(python3 "$RAG_DIR/rag_engine.py" query --query "$QUERY" --collection "$COLLECTION" 2>/dev/null)
+
+    # Extract context
+    CONTEXT=$(echo "$RESULTS" | jq -r '.documents[0][]' 2>/dev/null | head -5 | tr '\n' ' ')
+
+    if [ -z "$CONTEXT" ]; then
+        warn "No relevant documents found"
+        echo ""
+        echo "Answering without context..."
+        echo ""
+        y7-ai "$QUERY"
+        return
+    fi
+
+    echo ""
+    echo "Found relevant context. Generating answer..."
+    echo ""
+
+    # Generate answer with context
+    PROMPT="Based on the following context, answer the question.
+
+Context:
+$CONTEXT
+
+Question: $QUERY
+
+Answer:"
+
+    y7-ai "$PROMPT"
+}
+
+list_documents() {
+    local COLLECTION="${1:-default}"
+
+    check_deps
+
+    msg "Documents in collection '$COLLECTION':"
+    echo ""
+
+    RESULT=$(python3 "$RAG_DIR/rag_engine.py" list --collection "$COLLECTION" 2>/dev/null)
+    DOCS=$(echo "$RESULT" | jq -r '.documents[]' 2>/dev/null)
+
+    if [ -z "$DOCS" ]; then
+        echo "  No documents indexed"
+    else
+        echo "$DOCS" | while read -r doc; do
+            echo "  - $doc"
+        done
+    fi
+}
+
+remove_document() {
+    local FILENAME="$1"
+    local COLLECTION="${2:-default}"
+
+    if [ -z "$FILENAME" ]; then
+        error "Usage: y7-rag remove <filename>"
+    fi
+
+    check_deps
+
+    RESULT=$(python3 "$RAG_DIR/rag_engine.py" remove --file "$FILENAME" --collection "$COLLECTION" 2>/dev/null)
+    REMOVED=$(echo "$RESULT" | jq -r '.removed' 2>/dev/null || echo "0")
+
+    msg "Removed $REMOVED chunks from '$FILENAME'"
+}
+
+show_status() {
+    echo "=== Y7 RAG Status ==="
+    echo ""
+    echo "RAG Directory: $RAG_DIR"
+    echo ""
+
+    if [ -d "$RAG_DIR/db" ]; then
+        echo "Database: initialized"
+        SIZE=$(du -sh "$RAG_DIR/db" 2>/dev/null | cut -f1)
+        echo "Size: $SIZE"
+    else
+        echo "Database: not initialized (run: y7-rag init)"
+    fi
+
+    echo ""
+    echo "Embedding model:"
+    if ollama list 2>/dev/null | grep -q nomic-embed-text; then
+        echo "  nomic-embed-text: installed"
+    else
+        echo "  nomic-embed-text: not installed"
+    fi
+}
+
+# Main
+case "${1:-}" in
+    init)
+        init_rag
+        ;;
+    add)
+        shift
+        add_documents "$@"
+        ;;
+    query|ask|q)
+        shift
+        query_rag "$@"
+        ;;
+    list|ls)
+        shift
+        list_documents "$@"
+        ;;
+    remove|rm)
+        shift
+        remove_document "$@"
+        ;;
+    status)
+        show_status
+        ;;
+    -h|--help|help)
+        show_help
+        ;;
+    "")
+        show_help
+        ;;
+    *)
+        # Treat as query
+        query_rag "$*"
+        ;;
+esac
