@@ -337,7 +337,7 @@ jobs:
           mkdir -p config/includes.chroot/etc/skel
 
           # Copy all y7 tools
-          for tool in y7-ai y7-models y7-status y7-update y7-backup y7-serve y7-rag y7-voice; do
+          for tool in y7-ai y7-models y7-status y7-update y7-backup y7-serve y7-rag y7-voice y7-agents; do
             if [ -f "../tools/$tool" ]; then
               cp "../tools/$tool" config/includes.chroot/usr/local/bin/
               echo "Added: $tool"
@@ -359,11 +359,12 @@ jobs:
           alias serve='y7-serve'
           alias rag='y7-rag'
           alias voice='y7-voice'
+          alias agents='y7-agents'
 
           if [ ! -f ~/.y7os-welcomed ]; then
             echo ""
             echo "══════════════════════════════════════════════════"
-            echo "  Y7 OS v0.4.0 — AI Stack for Linux"
+            echo "  Y7 OS v0.5.0 — AI Stack for Linux"
             echo "  مرحباً بك في Y7 OS"
             echo "══════════════════════════════════════════════════"
             echo ""
@@ -371,6 +372,13 @@ jobs:
             echo "    y7-ai       — Chat with AI"
             echo "    y7-models   — Manage models"
             echo "    y7-status   — System dashboard"
+            echo ""
+            echo "  AI Agents:"
+            echo "    y7-agents   — Install & run AI agents"
+            echo "      zeus      — Personal AI framework"
+            echo "      uta       — Coding agent"
+            echo "      orphanim  — Security research agent"
+            echo "      dragon    — Multi-task agent"
             echo ""
             echo "  Advanced:"
             echo "    y7-gpu      — GPU detection & drivers"

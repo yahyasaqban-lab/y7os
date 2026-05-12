@@ -713,6 +713,63 @@ $ y7-ai --lang ar
 
 ---
 
+## AI Agents
+
+Y7 OS includes a powerful agent manager with four AI agents created by Yahya Saqban.
+
+### y7-agents — Agent Manager
+
+Install and run AI agents with a single command.
+
+**Usage:**
+```bash
+y7-agents list              # List available agents
+y7-agents install all       # Install all agents
+y7-agents install zeus      # Install specific agent
+y7-agents run zeus "Hello"  # Run an agent
+y7-agents status            # Check installation status
+```
+
+### Available Agents
+
+| Agent | Description | Use Case |
+|-------|-------------|----------|
+| **zeus** | Personal AI framework | Multi-platform (CLI, Telegram, Web), Arabic support |
+| **uta** | Terminal coding agent | Like Claude Code, self-hosted |
+| **orphanim** | Security research agent | Vulnerability discovery, reverse engineering |
+| **dragon** | Multi-task agent | Parallel sub-agents, autonomous tasks |
+
+### Examples
+
+```bash
+# Install all agents
+y7-agents install all
+
+# Chat with Zeus
+zeus chat "What's the Bitcoin price?"
+
+# Use Uta for coding
+uta "Create a Flask API with user authentication"
+
+# Security research with Orphanim
+orphanim "Analyze this binary for vulnerabilities"
+
+# Multi-task with Dragon
+dragon --plan "Research AI trends and create a report"
+```
+
+### API Keys
+
+Agents can use local Ollama (no API key needed) or cloud providers:
+
+```bash
+# For cloud providers (optional)
+export DEEPSEEK_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-..."
+```
+
+---
+
 ## Quick Reference Card
 
 ```
@@ -728,6 +785,13 @@ $ y7-ai --lang ar
 │    y7-models list           Show models                │
 │    y7-models recommend      Best for your RAM          │
 │    y7-models download X     Download model X           │
+│                                                        │
+│  AI AGENTS                                             │
+│    y7-agents install all    Install all agents         │
+│    zeus chat "message"      Personal AI assistant      │
+│    uta "coding task"        Coding agent               │
+│    orphanim "security"      Security research          │
+│    dragon "complex task"    Multi-task agent           │
 │                                                        │
 │  SYSTEM                                                │
 │    y7-status                System dashboard           │
