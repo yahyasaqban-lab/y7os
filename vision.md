@@ -28,7 +28,15 @@ Y7 OS is a Linux distribution built around one belief:
 
 No GPU required. No monthly subscription. No data leaving your device. No English-only interface. No 47-step setup guide.
 
-Just: one command, and it works.
+Just: **one command**, and it works.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | sudo bash
+```
+
+That command detects your hardware, installs everything you need, and gives you a fully functional local AI workstation. 10-45 minutes, depending on your device.
+
+No repositories to clone. No dependencies to manually resolve. No cargo-culting Stack Overflow answers at 2 AM.
 
 ---
 

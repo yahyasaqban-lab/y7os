@@ -14,15 +14,59 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"></a>
   <a href="https://github.com/yahyasaqban-lab/y7os/stargazers"><img src="https://img.shields.io/github/stars/yahyasaqban-lab/y7os?style=flat-square" alt="Stars"></a>
   <a href="https://y7os.dev"><img src="https://img.shields.io/badge/Website-y7os.dev-purple?style=flat-square" alt="Website"></a>
+  <a href=".github/workflows/test-installer.yml"><img src="https://github.com/yahyasaqban-lab/y7os/actions/workflows/test-installer.yml/badge.svg" alt="Installer Tests"></a>
 </p>
 
 <p align="center">
-  <a href="#download">Download</a> •
+  <a href="#quick-install">⚡ Quick Install</a> •
+  <a href="#download">Download ISO</a> •
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#documentation">Docs</a> •
   <a href="#roadmap">Roadmap</a>
 </p>
+
+---
+
+## ⚡ Quick Install (New! v0.1.0)
+
+**Turn any Linux machine into an AI workstation in one command:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | sudo bash
+```
+
+Or download and run locally:
+```bash
+wget https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install
+chmod +x y7-install
+sudo ./y7-install
+```
+
+### What the installer does:
+- ✅ Auto-detects your hardware (RAM, CPU, GPU, device type)
+- ✅ Picks the best AI backend — **Ollama** (8GB+) or **llama.cpp** (4-8GB)
+- ✅ Installs Python, Docker, Open WebUI
+- ✅ Sets up Y7 CLI tools
+- ✅ Enables ZRAM compression for low-resource devices
+- ✅ All in English **or Arabic** — auto-detects your language
+
+### Options
+```bash
+sudo ./y7-install --lang ar              # Force Arabic
+sudo ./y7-install --backend llama         # Force llama.cpp
+sudo ./y7-install --dry-run --verbose     # Simulate first
+sudo ./y7-install --skip-validation       # Skip post-install checks
+```
+
+**Compatible with:** Ubuntu 20.04+, Debian 11+, CentOS 8+, Raspberry Pi OS
+**Minimum:** 4GB RAM, 20GB storage
+
+> 📖 Full installer docs: [docs/INSTALLING.md](docs/INSTALLING.md)
+> 🧪 Test suite: [tools/test-installer.sh](tools/test-installer.sh)
+> 🔧 CI/CD: [.github/workflows/test-installer.yml](.github/workflows/test-installer.yml)
+
+---
 
 ---
 
