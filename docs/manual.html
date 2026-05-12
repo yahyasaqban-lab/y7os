@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Y7 OS User Manual</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --accent: #22d3ee;
+            --bg: #0f0f23;
+            --bg-light: #1a1a2e;
+            --bg-card: #16213e;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            font-size: 16px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 2rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+
+        /* Layout */
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-light);
+            border-right: 1px solid var(--border);
+            padding: 2rem 1rem;
+            position: sticky;
+            top: 140px;
+            height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+        }
+
+        .sidebar a {
+            display: block;
+            color: var(--text);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .sidebar a:hover {
+            background: var(--bg-card);
+            color: var(--accent);
+        }
+
+        .sidebar a.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            padding: 3rem;
+            max-width: 900px;
+        }
+
+        /* Sections */
+        section {
+            margin-bottom: 4rem;
+        }
+
+        h2 {
+            font-size: 2rem;
+            color: var(--text);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        h2 .icon {
+            font-size: 1.5rem;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            color: var(--text);
+            margin: 2rem 0 1rem;
+        }
+
+        h4 {
+            font-size: 1.1rem;
+            color: var(--accent);
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .feature-card .icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h4 {
+            margin: 0 0 0.5rem;
+            color: var(--text);
+        }
+
+        .feature-card p {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        /* Code Blocks */
+        pre {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.9rem;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--bg-card);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+            color: var(--accent);
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text);
+        }
+
+        .command-line::before {
+            content: "$ ";
+            color: var(--success);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-light);
+            color: var(--text);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        td {
+            color: var(--text-muted);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* Tool Reference */
+        .tool-ref {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            margin: 2rem 0;
+            overflow: hidden;
+        }
+
+        .tool-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .tool-header h3 {
+            margin: 0;
+            color: white;
+        }
+
+        .tool-header .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            color: white;
+        }
+
+        .tool-body {
+            padding: 1.5rem;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .alert-info {
+            background: rgba(34, 211, 238, 0.1);
+            border: 1px solid var(--accent);
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid var(--warning);
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success);
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Quick Reference Card */
+        .quick-ref {
+            background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-light) 100%);
+            border: 2px solid var(--primary);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .quick-ref h3 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        .quick-ref-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .quick-ref-section h4 {
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .quick-ref-section code {
+            display: block;
+            margin: 0.25rem 0;
+            font-size: 0.85rem;
+        }
+
+        /* Arabic Section */
+        .rtl {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .rtl code {
+            direction: ltr;
+            display: inline-block;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--bg-light);
+            border-top: 1px solid var(--border);
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Print Styles */
+        @media print {
+            .sidebar, .header {
+                display: none;
+            }
+            .main {
+                max-width: 100%;
+                padding: 1rem;
+            }
+            .container {
+                display: block;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .main {
+                padding: 1.5rem;
+            }
+            .header h1 {
+                font-size: 1.75rem;
+            }
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <svg class="logo" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#6366f1"/>
+                    <stop offset="100%" style="stop-color:#8b5cf6"/>
+                </linearGradient>
+                <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#22d3ee"/>
+                    <stop offset="100%" style="stop-color:#6366f1"/>
+                </linearGradient>
+            </defs>
+            <circle cx="100" cy="100" r="90" fill="url(#grad1)" opacity="0.1"/>
+            <path d="M100 20 L165 55 L165 125 L100 160 L35 125 L35 55 Z" fill="none" stroke="url(#grad1)" stroke-width="4"/>
+            <text x="100" y="95" font-family="system-ui" font-size="48" font-weight="700" fill="url(#grad2)" text-anchor="middle">Y7</text>
+            <text x="100" y="125" font-family="system-ui" font-size="20" font-weight="500" fill="#6366f1" text-anchor="middle">OS</text>
+        </svg>
+        <h1>Y7 OS User Manual</h1>
+        <p class="subtitle">Complete guide to the AI Stack for Linux</p>
+        <span class="version-badge">Version 0.4.0</span>
+    </header>
+
+    <div class="container">
+        <nav class="sidebar">
+            <h3>Getting Started</h3>
+            <a href="#introduction">Introduction</a>
+            <a href="#installation">Installation</a>
+            <a href="#first-steps">First Steps</a>
+
+            <h3>Core Tools</h3>
+            <a href="#y7-ai">y7-ai</a>
+            <a href="#y7-models">y7-models</a>
+            <a href="#y7-status">y7-status</a>
+
+            <h3>Advanced Tools</h3>
+            <a href="#y7-gpu">y7-gpu</a>
+            <a href="#y7-rag">y7-rag</a>
+            <a href="#y7-voice">y7-voice</a>
+            <a href="#y7-serve">y7-serve</a>
+
+            <h3>System Tools</h3>
+            <a href="#y7-update">y7-update</a>
+            <a href="#y7-backup">y7-backup</a>
+            <a href="#y7-persist">y7-persist</a>
+
+            <h3>Reference</h3>
+            <a href="#models">Models Guide</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+            <a href="#arabic">Arabic Guide</a>
+            <a href="#quick-ref">Quick Reference</a>
+        </nav>
+
+        <main class="main">
+            <!-- Introduction -->
+            <section id="introduction">
+                <h2><span class="icon">&#127968;</span> Introduction</h2>
+
+                <p>Y7 OS is a Linux distribution built for running AI locally. It transforms any computer into a private AI workstation without requiring cloud services, subscriptions, or sending data externally.</p>
+
+                <div class="card-grid">
+                    <div class="feature-card">
+                        <div class="icon">&#128274;</div>
+                        <h4>100% Local</h4>
+                        <p>All AI processing happens on your device. No data leaves your computer.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon">&#128187;</div>
+                        <h4>Low Resource</h4>
+                        <p>Runs on systems with as little as 4GB RAM.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon">&#128268;</div>
+                        <h4>Offline Capable</h4>
+                        <p>Works without internet after initial setup.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon">&#127760;</div>
+                        <h4>Bilingual</h4>
+                        <p>Full English and Arabic support.</p>
+                    </div>
+                </div>
+
+                <h3>System Requirements</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Minimum</th>
+                            <th>Recommended</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>RAM</td>
+                            <td>4 GB</td>
+                            <td>8 GB+</td>
+                        </tr>
+                        <tr>
+                            <td>Storage</td>
+                            <td>20 GB</td>
+                            <td>50 GB+</td>
+                        </tr>
+                        <tr>
+                            <td>CPU</td>
+                            <td>64-bit (x86/ARM)</td>
+                            <td>4+ cores</td>
+                        </tr>
+                        <tr>
+                            <td>GPU</td>
+                            <td>Not required</td>
+                            <td>NVIDIA (optional)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Installation -->
+            <section id="installation">
+                <h2><span class="icon">&#128229;</span> Installation</h2>
+
+                <h3>Option 1: Bootable USB (Recommended)</h3>
+                <div class="card">
+                    <h4>Step 1: Download the ISO</h4>
+                    <p>Get the latest release from GitHub:</p>
+                    <pre><code>https://github.com/yahyasaqban-lab/y7os/releases/latest</code></pre>
+
+                    <h4>Step 2: Flash to USB</h4>
+                    <pre><code><span class="command-line">sudo dd if=y7os-0.4.0-amd64.iso of=/dev/sdX bs=4M status=progress</span></code></pre>
+                    <p>Or use: Balena Etcher, Rufus, or Ventoy</p>
+
+                    <h4>Step 3: Boot and Login</h4>
+                    <pre><code>Username: y7
+Password: y7</code></pre>
+                </div>
+
+                <h3>Option 2: Quick Install Script</h3>
+                <div class="card">
+                    <p>Install Y7 OS tools on any existing Linux system:</p>
+                    <pre><code><span class="command-line">curl -fsSL https://raw.githubusercontent.com/yahyasaqban-lab/y7os/main/tools/y7-install | sudo bash</span></code></pre>
+                </div>
+
+                <h3>Option 3: Virtual Machine</h3>
+                <div class="card">
+                    <h4>QEMU</h4>
+                    <pre><code><span class="command-line">qemu-system-x86_64 -m 4G -cdrom y7os-0.4.0-amd64.iso -boot d -enable-kvm</span></code></pre>
+                </div>
+            </section>
+
+            <!-- First Steps -->
+            <section id="first-steps">
+                <h2><span class="icon">&#128640;</span> First Steps</h2>
+
+                <div class="alert alert-info">
+                    <span class="alert-icon">&#128161;</span>
+                    <div>
+                        <strong>First Boot Setup</strong><br>
+                        On first boot, Y7 OS automatically installs Ollama, downloads Open WebUI, and pulls a model based on your RAM. This takes 5-15 minutes.
+                    </div>
+                </div>
+
+                <h3>Your First AI Chat</h3>
+                <pre><code><span class="command-line">y7-ai</span>
+Welcome to Y7 AI! Type your message or 'exit' to quit.
+
+> What is machine learning?
+Machine learning is a subset of artificial intelligence that enables
+systems to learn and improve from experience without being explicitly
+programmed...</code></pre>
+
+                <h3>Web Interface</h3>
+                <p>Open a browser and go to:</p>
+                <pre><code>http://localhost:3000</code></pre>
+            </section>
+
+            <!-- y7-ai -->
+            <section id="y7-ai">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-ai</h3>
+                        <span class="badge">Core Tool</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Interactive AI chat from the command line.</p>
+
+                        <h4>Usage</h4>
+                        <pre><code><span class="command-line">y7-ai [options] [question]</span></code></pre>
+
+                        <h4>Options</h4>
+                        <table>
+                            <thead>
+                                <tr><th>Option</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>--model, -m</code></td><td>Specify model (e.g., llama3.1:8b)</td></tr>
+                                <tr><td><code>--system, -s</code></td><td>Set system prompt</td></tr>
+                                <tr><td><code>--lang, -l</code></td><td>Language (en or ar)</td></tr>
+                                <tr><td><code>--temp, -t</code></td><td>Temperature (0.0-2.0)</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h4>Examples</h4>
+                        <pre><code><span class="command-line">y7-ai "what is kubernetes?"</span>
+
+<span class="command-line">y7-ai -m qwen2.5:7b "explain machine learning"</span>
+
+<span class="command-line">cat code.py | y7-ai "review this code"</span>
+
+<span class="command-line">y7-ai --lang ar "ما هو الذكاء الاصطناعي؟"</span></code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-models -->
+            <section id="y7-models">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-models</h3>
+                        <span class="badge">Core Tool</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Download, list, and manage AI models.</p>
+
+                        <h4>Commands</h4>
+                        <table>
+                            <thead>
+                                <tr><th>Command</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>list</code></td><td>Show downloaded models</td></tr>
+                                <tr><td><code>recommend</code></td><td>Suggest best model for your RAM</td></tr>
+                                <tr><td><code>download &lt;model&gt;</code></td><td>Download a model</td></tr>
+                                <tr><td><code>remove &lt;model&gt;</code></td><td>Delete a model</td></tr>
+                                <tr><td><code>search &lt;query&gt;</code></td><td>Search available models</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h4>Examples</h4>
+                        <pre><code><span class="command-line">y7-models list</span>
+
+<span class="command-line">y7-models recommend</span>
+
+<span class="command-line">y7-models download qwen2.5:7b</span></code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-status -->
+            <section id="y7-status">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-status</h3>
+                        <span class="badge">Core Tool</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>View system status and AI stack health.</p>
+
+                        <h4>Options</h4>
+                        <table>
+                            <thead>
+                                <tr><th>Option</th><th>Description</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>--compact, -c</code></td><td>Single-line output</td></tr>
+                                <tr><td><code>--watch, -w</code></td><td>Continuous update</td></tr>
+                                <tr><td><code>--json, -j</code></td><td>JSON output</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h4>Examples</h4>
+                        <pre><code><span class="command-line">y7-status</span>
+
+<span class="command-line">y7-status --watch</span>
+
+<span class="command-line">y7-status --json | jq '.ram_used'</span></code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-gpu -->
+            <section id="y7-gpu">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-gpu</h3>
+                        <span class="badge">Advanced</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Detect and configure GPU acceleration.</p>
+
+                        <h4>Commands</h4>
+                        <pre><code><span class="command-line">y7-gpu detect</span>          # Check for GPU
+<span class="command-line">y7-gpu install nvidia</span>   # Install NVIDIA drivers
+<span class="command-line">y7-gpu status</span>           # Show GPU status</code></pre>
+
+                        <div class="alert alert-success">
+                            <span class="alert-icon">&#9989;</span>
+                            <div><strong>Supported:</strong> NVIDIA, AMD (amdgpu), Intel (i915)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-rag -->
+            <section id="y7-rag">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-rag</h3>
+                        <span class="badge">Advanced</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Ask questions about your documents using RAG (Retrieval Augmented Generation).</p>
+
+                        <h4>Workflow</h4>
+                        <pre><code><span class="command-line">y7-rag init</span>                    # Initialize
+<span class="command-line">y7-rag add ./documents/</span>        # Add documents
+<span class="command-line">y7-rag query "what is the conclusion?"</span>  # Ask questions</code></pre>
+
+                        <p><strong>Supported formats:</strong> .txt, .md, .pdf, .docx</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-voice -->
+            <section id="y7-voice">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-voice</h3>
+                        <span class="badge">Advanced</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Talk to AI using voice input and output.</p>
+
+                        <h4>Commands</h4>
+                        <pre><code><span class="command-line">y7-voice install</span>     # Install voice components
+<span class="command-line">y7-voice chat</span>        # Interactive voice chat
+<span class="command-line">y7-voice speak "Hello"</span>  # Text to speech
+<span class="command-line">y7-voice transcribe recording.wav</span>  # Transcribe audio</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-serve -->
+            <section id="y7-serve">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-serve</h3>
+                        <span class="badge">Advanced</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Run AI as an API server for external access.</p>
+
+                        <h4>API Endpoints</h4>
+                        <table>
+                            <thead>
+                                <tr><th>Service</th><th>URL</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Ollama API</td><td><code>http://localhost:11434</code></td></tr>
+                                <tr><td>OpenAI Compatible</td><td><code>http://localhost:11434/v1</code></td></tr>
+                                <tr><td>Open WebUI</td><td><code>http://localhost:3000</code></td></tr>
+                            </tbody>
+                        </table>
+
+                        <pre><code><span class="command-line">y7-serve status</span>    # Check status
+<span class="command-line">y7-serve webui</span>     # Start Open WebUI</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-update -->
+            <section id="y7-update">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-update</h3>
+                        <span class="badge">System</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Keep Y7 OS and models up to date.</p>
+
+                        <pre><code><span class="command-line">y7-update check</span>    # Check for updates
+<span class="command-line">y7-update all</span>      # Update everything
+<span class="command-line">y7-update tools</span>    # Update y7-* tools only
+<span class="command-line">y7-update models</span>   # Update models only</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-backup -->
+            <section id="y7-backup">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-backup</h3>
+                        <span class="badge">System</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Backup and restore your configuration and models.</p>
+
+                        <pre><code><span class="command-line">y7-backup create</span>           # Backup config
+<span class="command-line">y7-backup create --models</span>  # Include models (large!)
+<span class="command-line">y7-backup list</span>             # List backups
+<span class="command-line">y7-backup restore backup.tar.gz</span>  # Restore</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- y7-persist -->
+            <section id="y7-persist">
+                <div class="tool-ref">
+                    <div class="tool-header">
+                        <h3>y7-persist</h3>
+                        <span class="badge">System</span>
+                    </div>
+                    <div class="tool-body">
+                        <p>Save data across reboots when running from USB.</p>
+
+                        <pre><code><span class="command-line">y7-persist status</span>   # Check persistence
+<span class="command-line">y7-persist setup</span>    # Configure persistence</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Models Guide -->
+            <section id="models">
+                <h2><span class="icon">&#129302;</span> Models Guide</h2>
+
+                <h3>Recommended by RAM</h3>
+                <table>
+                    <thead>
+                        <tr><th>RAM</th><th>Model</th><th>Command</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>2 GB</td><td>TinyLlama</td><td><code>y7-models download tinyllama</code></td></tr>
+                        <tr><td>4 GB</td><td>Phi-3 Mini</td><td><code>y7-models download phi3:mini</code></td></tr>
+                        <tr><td>6 GB</td><td>Qwen 2.5 7B</td><td><code>y7-models download qwen2.5:7b</code></td></tr>
+                        <tr><td>8 GB</td><td>Llama 3.1 8B</td><td><code>y7-models download llama3.1:8b</code></td></tr>
+                    </tbody>
+                </table>
+
+                <h3>By Task</h3>
+                <div class="card-grid">
+                    <div class="card">
+                        <h4>&#128187; Coding</h4>
+                        <code>deepseek-coder-v2:6.7b</code><br>
+                        <code>qwen2.5-coder:7b</code>
+                    </div>
+                    <div class="card">
+                        <h4>&#127760; Arabic</h4>
+                        <code>qwen2.5:7b</code> (best)<br>
+                        <code>llama3.1:8b</code>
+                    </div>
+                    <div class="card">
+                        <h4>&#128269; Embeddings</h4>
+                        <code>nomic-embed-text</code>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section id="troubleshooting">
+                <h2><span class="icon">&#128295;</span> Troubleshooting</h2>
+
+                <div class="card">
+                    <h4>"No model found"</h4>
+                    <pre><code><span class="command-line">sudo systemctl start ollama</span>
+<span class="command-line">y7-models download tinyllama</span></code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>"Connection refused"</h4>
+                    <pre><code><span class="command-line">sudo systemctl restart ollama</span>
+<span class="command-line">curl http://localhost:11434/api/tags</span></code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>"Out of memory"</h4>
+                    <pre><code><span class="command-line">y7-models download tinyllama</span>  # Use smaller model
+<span class="command-line">systemctl status zramswap</span>      # Check ZRAM</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Open WebUI not loading</h4>
+                    <pre><code><span class="command-line">docker restart open-webui</span>
+<span class="command-line">docker logs open-webui</span></code></pre>
+                </div>
+            </section>
+
+            <!-- Arabic Guide -->
+            <section id="arabic" class="rtl">
+                <h2 style="direction: ltr;"><span class="icon">&#127760;</span> Arabic Guide / الدليل العربي</h2>
+
+                <h3>البدء السريع</h3>
+                <pre style="direction: ltr;"><code><span class="command-line">y7-ai --lang ar</span>
+
+<span class="command-line">export Y7_LANG=ar</span>
+<span class="command-line">y7-ai</span></code></pre>
+
+                <h3>أفضل النماذج للعربية</h3>
+                <table>
+                    <thead>
+                        <tr><th>النموذج</th><th>الذاكرة</th><th>الجودة</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>qwen2.5:7b</td><td>6 GB</td><td>ممتازة</td></tr>
+                        <tr><td>llama3.1:8b</td><td>8 GB</td><td>جيدة جداً</td></tr>
+                        <tr><td>phi3:mini</td><td>4 GB</td><td>مقبولة</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>الأوامر الرئيسية</h3>
+                <table>
+                    <thead>
+                        <tr><th>الأمر</th><th>الوصف</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>y7-ai</code></td><td>محادثة مع الذكاء الاصطناعي</td></tr>
+                        <tr><td><code>y7-models list</code></td><td>عرض النماذج المثبتة</td></tr>
+                        <tr><td><code>y7-status</code></td><td>لوحة حالة النظام</td></tr>
+                        <tr><td><code>y7-update all</code></td><td>تحديث كل شيء</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Quick Reference -->
+            <section id="quick-ref">
+                <h2><span class="icon">&#128221;</span> Quick Reference</h2>
+
+                <div class="quick-ref">
+                    <h3>Y7 OS Command Cheat Sheet</h3>
+                    <div class="quick-ref-grid">
+                        <div class="quick-ref-section">
+                            <h4>Chat</h4>
+                            <code>y7-ai</code>
+                            <code>y7-ai "question"</code>
+                            <code>y7-ai --lang ar</code>
+                        </div>
+                        <div class="quick-ref-section">
+                            <h4>Models</h4>
+                            <code>y7-models list</code>
+                            <code>y7-models recommend</code>
+                            <code>y7-models download X</code>
+                        </div>
+                        <div class="quick-ref-section">
+                            <h4>System</h4>
+                            <code>y7-status</code>
+                            <code>y7-update all</code>
+                            <code>y7-backup create</code>
+                        </div>
+                        <div class="quick-ref-section">
+                            <h4>Advanced</h4>
+                            <code>y7-gpu detect</code>
+                            <code>y7-rag query "..."</code>
+                            <code>y7-voice chat</code>
+                        </div>
+                        <div class="quick-ref-section">
+                            <h4>Web UI</h4>
+                            <code>localhost:3000</code>
+                        </div>
+                        <div class="quick-ref-section">
+                            <h4>Login</h4>
+                            <code>y7 / y7</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p><strong>Y7 OS</strong> — AI for everyone</p>
+        <p>
+            <a href="https://github.com/yahyasaqban-lab/y7os">GitHub</a> &bull;
+            <a href="https://y7os.dev">Website</a> &bull;
+            MIT License
+        </p>
+        <p style="margin-top: 1rem; font-size: 0.875rem;">
+            Built by <a href="https://github.com/yahyasaqban">Yahya Saqban</a> — Kuwait &#127472;&#127484;
+        </p>
+    </footer>
+
+    <script>
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Active nav highlighting
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.sidebar a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (scrollY >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
