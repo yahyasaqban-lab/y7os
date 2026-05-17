@@ -290,6 +290,12 @@ make build
 
 ---
 
+## Security
+
+Found a vulnerability? Please report it responsibly. See [SECURITY.md](SECURITY.md).
+
+---
+
 ## License
 
 MIT License — free forever. See [LICENSE](LICENSE).

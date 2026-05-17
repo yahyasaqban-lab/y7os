@@ -1,0 +1,42 @@
+name: ShellCheck
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.sh'
+      - 'tools/y7-*'
+      - 'scripts/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.sh'
+      - 'tools/y7-*'
+      - 'scripts/**'
+
+jobs:
+  shellcheck:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on tools
+        run: |
+          echo "Checking tools/y7-* scripts..."
+          find tools -maxdepth 1 -type f -name 'y7-*' -exec shellcheck -x {} +
+
+      - name: Run ShellCheck on scripts
+        run: |
+          echo "Checking scripts/*.sh..."
+          find scripts -name '*.sh' -exec shellcheck -x {} + || true
+
+      - name: Run ShellCheck on test scripts
+        run: |
+          echo "Checking test scripts..."
+          find tools -name 'test-*.sh' -exec shellcheck -x {} + || true

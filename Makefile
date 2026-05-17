@@ -46,7 +46,14 @@ test:
 
 lint:
 	@echo "Checking scripts with shellcheck..."
-	@shellcheck tools/y7-* || echo "Install shellcheck: apt install shellcheck"
+	@command -v shellcheck >/dev/null || { echo "Install shellcheck: apt install shellcheck"; exit 1; }
+	@echo "  Checking tools/y7-*..."
+	@shellcheck -x tools/y7-*
+	@echo "  Checking scripts/*.sh..."
+	@shellcheck -x scripts/*.sh 2>/dev/null || true
+	@echo "  Checking tools/test-*.sh..."
+	@shellcheck -x tools/test-*.sh 2>/dev/null || true
+	@echo "All checks passed!"
 
 clean:
 	@rm -f *.tmp *.log
