@@ -15,7 +15,7 @@ set -euo pipefail
 # Configuration & Globals
 ################################################################################
 
-readonly VERSION="0.1.0"
+readonly VERSION="0.1.1"
 readonly SCRIPT_NAME="y7-install"
 readonly LOG_FILE="/var/log/y7-install.log"
 readonly BACKUP_DIR="/opt/y7-backups"
@@ -379,8 +379,19 @@ install_docker() {
         return
     fi
     
-    # Install Docker from official repository
-    run_cmd "apt-get install -y docker.io docker-compose"
+    # Install Docker from official repository (not apt docker.io package)
+    run_cmd "apt-get update -qq"
+    run_cmd "apt-get install -y ca-certificates curl gnupg"
+    run_cmd "install -m 0755 -d /etc/apt/keyrings"
+    run_cmd "curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc"
+    run_cmd "chmod a+r /etc/apt/keyrings/docker.asc"
+    
+    # Add repository (detect OS codename)
+    CODENAME="$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2)"
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${CODENAME} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    run_cmd "apt-get update -qq"
+    run_cmd "apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
     
     # Enable Docker daemon
     run_cmd "systemctl enable docker"
@@ -390,7 +401,7 @@ install_docker() {
     # run_cmd "usermod -aG docker $SUDO_USER"
     
     HAS_DOCKER=true
-    msg_success "Docker installed" "تم تثبيت Docker"
+    msg_success "Docker installed from official repo" "تم تثبيت Docker من المصدر الرسمي"
 }
 
 install_git() {
@@ -439,8 +450,8 @@ install_llama_cpp() {
         return
     fi
     
-    msg_info "Cloning llama.cpp repository..." "جاري نسخ مستودع llama.cpp..."
-    run_cmd "git clone https://github.com/ggerganov/llama.cpp.git /opt/llama.cpp"
+    msg_info "Cloning llama.cpp repository (shallow)..." "جاري نسخ مستودع llama.cpp..."
+    run_cmd "git clone --depth 1 https://github.com/ggerganov/llama.cpp.git /opt/llama.cpp"
     
     msg_info "Building llama.cpp..." "جاري بناء llama.cpp..."
     run_cmd "cd /opt/llama.cpp && make -j$DETECTED_CPU_CORES"
@@ -455,6 +466,7 @@ install_open_webui() {
     
     msg_info "Installing via Docker..." "جاري التثبيت عبر Docker..."
     
+    # host.docker.internal doesn't work on Linux — use host network instead
     cat > /opt/y7/docker-compose.open-webui.yml <<'EOF'
 version: '3.8'
 services:
@@ -463,8 +475,9 @@ services:
     container_name: open-webui
     ports:
       - "3000:8080"
+    network_mode: "host"
     environment:
-      - OLLAMA_API_BASE_URL=http://host.docker.internal:11434
+      - OLLAMA_API_BASE_URL=http://127.0.0.1:11434
     volumes:
       - open-webui-data:/app/backend/data
     restart: unless-stopped
@@ -473,7 +486,14 @@ volumes:
   open-webui-data:
 EOF
     
-    msg_success "Open WebUI Docker Compose created" "تم إنشاء Docker Compose لـ Open WebUI"
+    # Actually start Open WebUI
+    if command -v docker &> /dev/null && docker info &>/dev/null; then
+        msg_info "Starting Open WebUI container..." "جاري تشغيل Open WebUI..."
+        run_cmd "cd /opt/y7 && docker compose -f docker-compose.open-webui.yml up -d"
+        msg_success "Open WebUI is now running at http://localhost:3000" "Open WebUI يعمل الآن على http://localhost:3000"
+    else
+        msg_info "Docker not ready yet — run later: cd /opt/y7 && docker compose up -d" "Docker ليس جاهزًا بعد — شغّل لاحقًا: cd /opt/y7 && docker compose up -d"
+    fi
 }
 
 install_ai_stack() {

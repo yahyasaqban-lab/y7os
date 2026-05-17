@@ -1,0 +1,32 @@
+# System & editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs & temp files
+*.log
+/tmp/
+/temp/
+
+# Build artifacts
+*.o
+*.so
+*.a
+*.dylib
+*.exe
+*.dll
+dist/
+build/
+
+# Y7 runtime (user-created content, not tracked)
+/opt/y7/
+
+# Dotenv & secrets
+.env
+.env.local
+*.key
+*.pem
