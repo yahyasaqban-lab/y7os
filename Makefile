@@ -1,20 +1,21 @@
 # Y7 OS — Makefile
 # github.com/yahyasaqban-lab/y7os
 
-.PHONY: install uninstall test clean help
+.PHONY: install uninstall test lint clean help setup-hooks
 
-TOOLS = y7-ai y7-models y7-status
+TOOLS = y7-ai y7-models y7-status y7-doctor y7-bench y7-update
 PREFIX ?= /usr/local/bin
 
 help:
 	@echo ""
 	@echo "  Y7 OS — AI Stack for Linux"
 	@echo ""
-	@echo "  make install    Install Y7 tools to $(PREFIX)"
-	@echo "  make uninstall  Remove Y7 tools"
-	@echo "  make test       Run installer dry-run"
-	@echo "  make lint       Check scripts with shellcheck"
-	@echo "  make clean      Remove temp files"
+	@echo "  make install      Install Y7 tools to $(PREFIX)"
+	@echo "  make uninstall    Remove Y7 tools"
+	@echo "  make test         Run basic tool tests"
+	@echo "  make lint         Check scripts with shellcheck"
+	@echo "  make setup-hooks  Install pre-commit hooks"
+	@echo "  make clean        Remove temp files"
 	@echo ""
 
 install:
@@ -54,6 +55,12 @@ lint:
 	@echo "  Checking tools/test-*.sh..."
 	@shellcheck -x tools/test-*.sh 2>/dev/null || true
 	@echo "All checks passed!"
+
+setup-hooks:
+	@echo "Setting up pre-commit hooks..."
+	@command -v pre-commit >/dev/null || { echo "Installing pre-commit..."; pip install pre-commit; }
+	@pre-commit install
+	@echo "Pre-commit hooks installed!"
 
 clean:
 	@rm -f *.tmp *.log

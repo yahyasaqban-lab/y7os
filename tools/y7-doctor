@@ -1,0 +1,223 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-doctor — Y7 OS System Diagnostic Tool
+#  Checks system health and troubleshoots common issues
+#  github.com/yahyasaqban-lab/y7os
+# ─────────────────────────────────────────────────────────────
+
+set -euo pipefail
+
+# ── Colors ────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+
+# ── Language ──────────────────────────────────────────────────
+LANG_AR=false
+[[ "${1:-}" == "--lang" && "${2:-}" == "ar" ]] && LANG_AR=true
+[[ "${LANG:-}" == ar* ]] && LANG_AR=true
+
+# ── Bilingual messages ────────────────────────────────────────
+msg() {
+    local en="$1" ar="$2"
+    if $LANG_AR; then echo -e "$ar"; else echo -e "$en"; fi
+}
+
+# ── Check functions ───────────────────────────────────────────
+ISSUES=0
+WARNINGS=0
+
+check_pass() {
+    echo -e "  ${GREEN}✓${NC} $1"
+}
+
+check_warn() {
+    echo -e "  ${YELLOW}⚠${NC} $1"
+    ((WARNINGS++))
+}
+
+check_fail() {
+    echo -e "  ${RED}✗${NC} $1"
+    ((ISSUES++))
+}
+
+check_info() {
+    echo -e "  ${CYAN}ℹ${NC} $1"
+}
+
+# ── Header ────────────────────────────────────────────────────
+echo ""
+msg "${BOLD}${BLUE}Y7 OS Doctor — System Diagnostic${NC}" "${BOLD}${BLUE}طبيب Y7 OS — فحص النظام${NC}"
+echo "─────────────────────────────────────────────────────"
+echo ""
+
+# ── 1. System Resources ───────────────────────────────────────
+msg "${BOLD}1. System Resources${NC}" "${BOLD}1. موارد النظام${NC}"
+
+# RAM Check
+ram_total=$(free -m | awk '/^Mem:/{print $2}')
+ram_available=$(free -m | awk '/^Mem:/{print $7}')
+ram_used_pct=$((100 - (ram_available * 100 / ram_total)))
+
+if [ "$ram_total" -lt 4000 ]; then
+    check_fail "RAM: ${ram_total}MB (minimum 4GB recommended)"
+elif [ "$ram_available" -lt 1000 ]; then
+    check_warn "RAM: ${ram_available}MB available (low memory)"
+else
+    check_pass "RAM: ${ram_total}MB total, ${ram_available}MB available"
+fi
+
+# Disk Check
+disk_available=$(df -BG / | awk 'NR==2{print $4}' | tr -d 'G')
+if [ "$disk_available" -lt 10 ]; then
+    check_fail "Disk: ${disk_available}GB free (need at least 10GB)"
+elif [ "$disk_available" -lt 20 ]; then
+    check_warn "Disk: ${disk_available}GB free (20GB+ recommended)"
+else
+    check_pass "Disk: ${disk_available}GB available"
+fi
+
+# ZRAM Check
+if grep -q zram /proc/swaps 2>/dev/null; then
+    zram_size=$(grep zram /proc/swaps | awk '{sum+=$3} END {print int(sum/1024)}')
+    check_pass "ZRAM: ${zram_size}MB compressed swap enabled"
+else
+    check_warn "ZRAM: Not enabled (recommended for low-RAM systems)"
+    check_info "  Enable with: sudo modprobe zram && sudo zramctl /dev/zram0 -s 2G"
+fi
+
+echo ""
+
+# ── 2. AI Services ────────────────────────────────────────────
+msg "${BOLD}2. AI Services${NC}" "${BOLD}2. خدمات الذكاء الاصطناعي${NC}"
+
+# Ollama
+if command -v ollama &>/dev/null; then
+    if curl -s --max-time 2 http://localhost:11434/api/tags &>/dev/null; then
+        model_count=$(curl -s http://localhost:11434/api/tags 2>/dev/null | grep -c '"name"' || echo 0)
+        check_pass "Ollama: Running ($model_count models)"
+    else
+        check_warn "Ollama: Installed but not running"
+        check_info "  Start with: ollama serve"
+    fi
+else
+    check_fail "Ollama: Not installed"
+    check_info "  Install with: curl -fsSL https://ollama.com/install.sh | sh"
+fi
+
+# Docker
+if command -v docker &>/dev/null; then
+    if docker info &>/dev/null 2>&1; then
+        containers=$(docker ps -q 2>/dev/null | wc -l)
+        check_pass "Docker: Running ($containers containers)"
+    else
+        check_warn "Docker: Installed but not running"
+        check_info "  Start with: sudo systemctl start docker"
+    fi
+else
+    check_warn "Docker: Not installed (needed for Open WebUI)"
+    check_info "  Install with: curl -fsSL https://get.docker.com | sh"
+fi
+
+# Open WebUI
+if curl -s --max-time 2 http://localhost:8080 &>/dev/null; then
+    check_pass "Open WebUI: Running at http://localhost:8080"
+elif curl -s --max-time 2 http://localhost:3000 &>/dev/null; then
+    check_pass "Open WebUI: Running at http://localhost:3000"
+else
+    check_warn "Open WebUI: Not running"
+    check_info "  Start with: docker run -d -p 8080:8080 --name open-webui ghcr.io/open-webui/open-webui:main"
+fi
+
+echo ""
+
+# ── 3. Y7 Tools ───────────────────────────────────────────────
+msg "${BOLD}3. Y7 Tools${NC}" "${BOLD}3. أدوات Y7${NC}"
+
+for tool in y7-ai y7-models y7-status y7-bench; do
+    if command -v "$tool" &>/dev/null; then
+        check_pass "$tool: Installed"
+    elif [ -x "/opt/y7/tools/$tool" ]; then
+        check_warn "$tool: Installed but not in PATH"
+        check_info "  Add to PATH: export PATH=\"\$PATH:/opt/y7/tools\""
+    else
+        check_warn "$tool: Not found"
+    fi
+done
+
+echo ""
+
+# ── 4. Network ────────────────────────────────────────────────
+msg "${BOLD}4. Network${NC}" "${BOLD}4. الشبكة${NC}"
+
+# Internet connectivity
+if curl -s --max-time 3 https://ollama.com &>/dev/null; then
+    check_pass "Internet: Connected"
+else
+    check_warn "Internet: Not connected or slow"
+    check_info "  Y7 OS works offline, but model downloads need internet"
+fi
+
+# Localhost ports
+for port in 11434 8080 3000; do
+    if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
+        service="unknown"
+        case $port in
+            11434) service="Ollama" ;;
+            8080|3000) service="Open WebUI" ;;
+        esac
+        check_info "Port $port: In use ($service)"
+    fi
+done
+
+echo ""
+
+# ── 5. GPU Detection ──────────────────────────────────────────
+msg "${BOLD}5. GPU${NC}" "${BOLD}5. معالج الرسوميات${NC}"
+
+# NVIDIA
+if command -v nvidia-smi &>/dev/null; then
+    gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
+    gpu_mem=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | head -1)
+    check_pass "NVIDIA: $gpu_name ($gpu_mem)"
+elif lspci 2>/dev/null | grep -qi nvidia; then
+    check_warn "NVIDIA GPU detected but drivers not installed"
+    check_info "  Install with: sudo apt install nvidia-driver-535"
+else
+    check_info "NVIDIA: Not detected"
+fi
+
+# AMD
+if command -v rocm-smi &>/dev/null; then
+    check_pass "AMD ROCm: Installed"
+elif lspci 2>/dev/null | grep -qi "amd.*radeon"; then
+    check_info "AMD GPU: Detected (ROCm not installed)"
+fi
+
+# Intel
+if lspci 2>/dev/null | grep -qi "intel.*graphics"; then
+    check_info "Intel GPU: Detected"
+fi
+
+echo ""
+
+# ── Summary ───────────────────────────────────────────────────
+echo "─────────────────────────────────────────────────────"
+if [ $ISSUES -eq 0 ] && [ $WARNINGS -eq 0 ]; then
+    msg "${GREEN}${BOLD}All checks passed! Y7 OS is healthy.${NC}" "${GREEN}${BOLD}جميع الفحوصات ناجحة! Y7 OS بحالة جيدة.${NC}"
+elif [ $ISSUES -eq 0 ]; then
+    msg "${YELLOW}${BOLD}$WARNINGS warning(s) found. System is functional.${NC}" "${YELLOW}${BOLD}تم العثور على $WARNINGS تحذير(ات). النظام يعمل.${NC}"
+else
+    msg "${RED}${BOLD}$ISSUES issue(s) found. Please review above.${NC}" "${RED}${BOLD}تم العثور على $ISSUES مشكلة(ات). يرجى المراجعة.${NC}"
+fi
+echo ""
+
+# ── Fix suggestions ───────────────────────────────────────────
+if [ $ISSUES -gt 0 ] || [ $WARNINGS -gt 0 ]; then
+    msg "${BOLD}Quick Fixes:${NC}" "${BOLD}إصلاحات سريعة:${NC}"
+    echo "  y7-install          # Full installation/repair"
+    echo "  y7-update           # Update Y7 OS components"
+    echo "  y7-doctor --fix     # Auto-fix common issues (coming soon)"
+    echo ""
+fi
+
+exit $ISSUES
