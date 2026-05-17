@@ -46,6 +46,42 @@ ensure_ollama() {
 
 # ── Help ──────────────────────────────────────────────────────
 show_help() {
+  # Check if system is set to Arabic
+  if [[ "${LANG:-}" == ar* ]] || [[ "${LC_ALL:-}" == ar* ]]; then
+    show_help_ar
+  else
+    show_help_en
+  fi
+}
+
+show_help_ar() {
+  echo ""
+  echo -e "${BOLD}  y7-ai — مُشغّل الذكاء الاصطناعي${NC}"
+  echo -e "  ${CYAN}github.com/yahyasaqban-lab/y7os${NC}"
+  echo ""
+  echo -e "  ${BOLD}الاستخدام:${NC}"
+  echo -e "    ${CYAN}y7-ai${NC}                     محادثة تفاعلية (يختار النموذج تلقائياً)"
+  echo -e "    ${CYAN}y7-ai \"سؤالك\"${NC}            سؤال واحد، يطبع الإجابة"
+  echo -e "    ${CYAN}y7-ai --model phi3${NC}        استخدام نموذج محدد"
+  echo ""
+  echo -e "  ${BOLD}الخيارات:${NC}"
+  echo -e "    ${CYAN}--model <اسم>${NC}    استخدام نموذج محدد (مثل: phi3, mistral, qwen)"
+  echo -e "    ${CYAN}--lang ar${NC}         استخدام العربية"
+  echo -e "    ${CYAN}--help${NC}            عرض المساعدة"
+  echo ""
+  echo -e "  ${BOLD}أمثلة:${NC}"
+  echo -e "    y7-ai \"ما هو لينكس؟\""
+  echo -e "    y7-ai --lang ar \"اشرح البرمجة\""
+  echo -e "    y7-ai --model qwen \"مرحباً\""
+  echo ""
+  echo -e "  ${BOLD}النماذج المدعومة للعربية:${NC}"
+  echo -e "    ${GREEN}qwen2${NC}     — الأفضل للعربية (7GB RAM)"
+  echo -e "    ${GREEN}llama3${NC}    — جيد جداً (8GB RAM)"
+  echo -e "    ${GREEN}phi3${NC}      — جيد (4GB RAM)"
+  echo ""
+}
+
+show_help_en() {
   echo ""
   echo -e "${BOLD}  y7-ai — Y7 OS AI Launcher${NC}"
   echo -e "  ${CYAN}github.com/yahyasaqban-lab/y7os${NC}"

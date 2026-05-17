@@ -15,6 +15,8 @@
   <a href="https://github.com/yahyasaqban-lab/y7os/stargazers"><img src="https://img.shields.io/github/stars/yahyasaqban-lab/y7os?style=flat-square" alt="Stars"></a>
   <a href="https://y7os.dev"><img src="https://img.shields.io/badge/Website-y7os.dev-purple?style=flat-square" alt="Website"></a>
   <a href=".github/workflows/test-installer.yml"><img src="https://github.com/yahyasaqban-lab/y7os/actions/workflows/test-installer.yml/badge.svg" alt="Installer Tests"></a>
+  <a href=".github/workflows/shellcheck.yml"><img src="https://github.com/yahyasaqban-lab/y7os/actions/workflows/shellcheck.yml/badge.svg" alt="ShellCheck"></a>
+  <a href="https://pre-commit.com/"><img src="https://img.shields.io/badge/pre--commit-enabled-brightgreen?style=flat-square&logo=pre-commit" alt="pre-commit"></a>
 </p>
 
 <p align="center">
