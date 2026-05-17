@@ -15,7 +15,7 @@ set -euo pipefail
 # Configuration & Globals
 ################################################################################
 
-readonly VERSION="0.1.1"
+readonly VERSION="0.2.0"
 readonly SCRIPT_NAME="y7-install"
 readonly LOG_FILE="/var/log/y7-install.log"
 readonly BACKUP_DIR="/opt/y7-backups"
@@ -52,6 +52,7 @@ AI_BACKEND="ollama"  # Default, may be overridden
 SKIP_VALIDATION=false
 VERBOSE=false
 DRY_RUN=false
+LIGHT_MODE=false
 
 ################################################################################
 # Bilingual String Functions
@@ -173,6 +174,7 @@ OPTIONS:
     -s, --skip-validation   Skip component validation after install
     --lang en|ar            Set language (en=English, ar=Arabic)
     --backend ollama|llama  Choose AI backend (default: ollama)
+    --light, --minimal      Minimal install (Ollama only, no Docker/Open WebUI)
 
 EXAMPLES:
     sudo $SCRIPT_NAME                    # Standard installation (English)
@@ -935,6 +937,10 @@ main() {
                 SKIP_VALIDATION=true
                 shift
                 ;;
+            --light|--minimal)
+                LIGHT_MODE=true
+                shift
+                ;;
             --lang)
                 LANG_MODE="$2"
                 shift 2
@@ -955,7 +961,7 @@ main() {
     mkdir -p "$(dirname "$LOG_FILE")"
     touch "$LOG_FILE"
     log "=== Y7 OS Installation Started (v${VERSION}) ==="
-    log "Language: $LANG_MODE | Backend: $AI_BACKEND | Verbose: $VERBOSE | DryRun: $DRY_RUN"
+    log "Language: $LANG_MODE | Backend: $AI_BACKEND | Verbose: $VERBOSE | DryRun: $DRY_RUN | Light: $LIGHT_MODE"
     
     # Run installation phases
     preflight_checks
@@ -970,7 +976,12 @@ main() {
     
     configure_zram
     
-    install_ai_stack
+    if [[ "$LIGHT_MODE" == "true" ]]; then
+        msg_info "LIGHT MODE: Installing minimal stack (no Docker, no Open WebUI)" \
+                 "الوضع الخفيف: تثبيت أساسي فقط (بدون Docker، بدون Open WebUI)"
+    else
+        install_ai_stack
+    fi
     install_y7_tools
     
     validate_installation

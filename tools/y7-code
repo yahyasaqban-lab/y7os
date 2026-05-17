@@ -1,0 +1,75 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-code — Y7 OS AI Code Assistant
+#  Code review, generation, explanation via local LLM or API
+#  github.com/yahyasaqban-lab/y7os  |  MIT License
+# ─────────────────────────────────────────────────────────────
+set -e
+VERSION="1.0.0"; LANG="${Y7_LANG:-en}"
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+msg()  { echo -e "${GREEN}[y7-code]${NC} $1"; }
+warn() { echo -e "${YELLOW}[y7-code]${NC} $1"; }
+error(){ echo -e "${RED}[y7-code]${NC} $1"; exit 1; }
+
+show_help() {
+cat <<EOF
+${BOLD}y7-code — AI Code Assistant${NC}
+USAGE: y7-code <command> [file|options]
+COMMANDS:
+  review <file>       Review code for bugs, security, style
+  explain <file>      Explain what the code does
+  gen "desc"          Generate code from description
+  translate <f> <to>  Translate code (python/bash/go/rust/js)
+  fix <file>          Suggest fixes
+  docs <file>         Generate documentation
+OPTIONS: --model <name> (default phi3:mini), --lang ar, --help
+EXAMPLES:
+  y7-code review script.py
+  y7-code gen "bash script that monitors disk usage"
+  cat code.sh | y7-code review -
+EOF
+}
+
+ensure_ollama() {
+  command -v ollama &>/dev/null || error "Ollama not installed"
+  curl -s --max-time 2 http://localhost:11434 &>/dev/null || {
+    ollama serve &>/dev/null &
+    local w=0
+    while ! curl -s --max-time 1 http://localhost:11434 &>/dev/null; do
+      sleep 1; w=$((w+1)); [ $w -gt 10 ] && error "Ollama failed to start"
+    done
+  }
+}
+
+MODEL="${Y7_CODE_MODEL:-phi3:mini}"; COMMAND=""; FILE=""; TARGET=""; EXTRA=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h) show_help; exit 0 ;;
+    --model|-m) MODEL="$2"; shift 2 ;;
+    --lang) [[ "$2" == "ar" ]] && LANG="ar"; shift 2 ;;
+    review|explain|gen|translate|fix|docs) COMMAND="$1"; shift ;;
+    *) [[ -z "$FILE" ]] && FILE="$1" || [[ -z "$TARGET" ]] && TARGET="$1" || EXTRA="$EXTRA $1"; shift ;;
+  esac
+done
+
+CODE=""
+[[ "$FILE" == "-" || -z "$FILE" && ! -t 0 ]] && CODE=$(cat)
+[[ -n "$FILE" && "$FILE" != "-" ]] && CODE=$(cat "$FILE" 2>/dev/null) || [[ -z "$CODE" ]] && { [[ -n "$FILE" ]] && error "File not found: $FILE"; }
+
+case "$COMMAND" in
+  review)  SYS="Analyze for bugs, security, performance, style. Be specific." ;;
+  explain) SYS="Explain code clearly. Focus on what it does and how." ;;
+  gen)     SYS="Generate production-ready code with comments and error handling. Output ONLY code."; CODE="$EXTRA" ;;
+  translate) SYS="Translate this code to $TARGET. Preserve logic. Output ONLY code." ;;
+  fix)     SYS="Fix bugs. Show what was wrong and the fix." ;;
+  docs)    SYS="Generate docs: description, params, returns, examples." ;;
+  *)       error "Unknown command: $COMMAND" ;;
+esac
+[[ "$LANG" == "ar" ]] && SYS="أنت مساعد برمجة. أجب بالعربية. $SYS"
+
+ensure_ollama
+msg "Model: ${BOLD}$MODEL${NC} | Command: $COMMAND"
+echo -e "\n${CYAN}──────────────────────${NC}"
+echo "$SYS"$'\n'"'''$CODE'''" | ollama run "$MODEL"
+echo -e "\n${CYAN}──────────────────────${NC}"

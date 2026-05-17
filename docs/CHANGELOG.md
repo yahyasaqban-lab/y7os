@@ -1,5 +1,21 @@
 # Y7 OS Changelog
 
+## v0.2.0 — Light Mode + New Tools (May 18, 2026)
+
+### 🎯 New Tools
+- **`y7-code`** — AI code assistant (review, generate, translate, fix, docs)
+- **`y7-web`** — Web dashboard at `localhost:9090` with live system status
+- **`--light`/`--minimal` flag** on `y7-install` — installs Ollama + CLI only, skips Docker/WebUI
+- **`docs/LIGHT_MODE.md`** — guide for minimal installations
+
+### 🛠 Improved
+- Fixed execute permissions on `y7-agents`, `y7-backup`, `y7-rag`, `y7-serve`, `y7-voice`, `y7-update`
+- README updated with full 12-tool table
+- Makefile includes all 12 tools
+- Installer version bumped to v0.2.0
+
+---
+
 ## v0.3.0 (WIP) — Live-Friendly Edition
 
 ### 🎯 New

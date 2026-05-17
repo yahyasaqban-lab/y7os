@@ -3,7 +3,7 @@
 
 .PHONY: install uninstall test lint clean help setup-hooks
 
-TOOLS = y7-ai y7-models y7-status y7-doctor y7-bench y7-update
+TOOLS = y7-ai y7-models y7-status y7-doctor y7-update y7-code y7-web y7-backup y7-agents y7-rag y7-serve y7-voice
 PREFIX ?= /usr/local/bin
 
 help:
@@ -44,6 +44,12 @@ test:
 	@echo ""
 	@echo "Testing y7-ai --help..."
 	@bash tools/y7-ai --help
+	@echo ""
+	@echo "Testing y7-code --help..."
+	@bash tools/y7-code --help
+	@echo ""
+	@echo "Testing y7-web --help..."
+	@bash tools/y7-web --help
 
 lint:
 	@echo "Checking scripts with shellcheck..."

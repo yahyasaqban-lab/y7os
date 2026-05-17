@@ -1,0 +1,103 @@
+#!/bin/bash
+# ─────────────────────────────────────────────────────────────
+#  y7-web — Y7 OS Web Dashboard
+#  Local web UI for all Y7 tools
+#  github.com/yahyasaqban-lab/y7os  |  MIT License
+# ─────────────────────────────────────────────────────────────
+set -e; VERSION="1.0.0"; PORT="${Y7_WEB_PORT:-9090}"
+[[ "$1" == "--help" || "$1" == "-h" ]] && { echo "y7-web [--port PORT] — Start web dashboard"; exit 0; }
+[[ "$1" == "--port" ]] && PORT="$2"
+python3 -c "import http.server, socketserver, json, subprocess, os
+
+PORT = int(os.environ.get('Y7_WEB_PORT', '$PORT'))
+HTML = '''<!DOCTYPE html>
+<html lang=\"en\">
+<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">
+<title>Y7 OS Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:2rem;border-bottom:1px solid #30363d}
+.header h1{font-size:2rem;color:#58a6ff}.header p{color:#8b949e;margin-top:0.5rem}
+.container{max-width:1200px;margin:0 auto;padding:2rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.5rem;transition:all 0.2s}
+.card:hover{border-color:#58a6ff;transform:translateY(-2px)}
+.card h3{color:#58a6ff;margin-bottom:0.5rem}.card p{color:#8b949e;font-size:0.9rem;margin-bottom:1rem}
+.card code{background:#0d1117;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.85rem}
+.status-bar{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:2rem}
+.status-item{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1rem;flex:1;min-width:150px;text-align:center}
+.status-item .value{font-size:1.5rem;font-weight:bold;margin-top:0.3rem}
+.status-item .label{font-size:0.8rem;color:#8b949e}
+.green{color:#3fb950}.yellow{color:#d29922}.red{color:#f85149}
+.section-title{font-size:1.3rem;margin:2rem 0 1rem;color:#f0f6fc}
+footer{text-align:center;padding:2rem;color:#484f58;font-size:0.85rem}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class=\"header\"><h1>🐉 Y7 OS</h1><p>AI-First Linux Distribution</p></div>
+<div class=\"container\">
+<div class=\"status-bar\">
+<div class=\"status-item\"><div class=\"label\">RAM</div><div class=\"value green\" id=\"ram\">-</div></div>
+<div class=\"status-item\"><div class=\"label\">Ollama</div><div class=\"value\" id=\"ollama-status\">...</div></div>
+<div class=\"status-item\"><div class=\"label\">Disk</div><div class=\"value\" id=\"disk\">-</div></div>
+<div class=\"status-item\"><div class=\"label\">Uptime</div><div class=\"value\" id=\"uptime\">-</div></div>
+</div>
+<h2 class=\"section-title\">CLI Tools</h2>
+<div class=\"grid\">
+<div class=\"card\"><h3>y7-ai</h3><p>AI chat with auto model selection</p><code>y7-ai \"question\"</code></div>
+<div class=\"card\"><h3>y7-code</h3><p>Code review, generation, translation</p><code>y7-code review file.py</code></div>
+<div class=\"card\"><h3>y7-models</h3><p>Model manager</p><code>y7-models list</code></div>
+<div class=\"card\"><h3>y7-agents</h3><p>Autonomous AI agents</p><code>y7-agents create \"task\"</code></div>
+<div class=\"card\"><h3>y7-rag</h3><p>RAG pipeline</p><code>y7-rag ingest ./docs</code></div>
+<div class=\"card\"><h3>y7-voice</h3><p>Voice commands</p><code>y7-voice listen</code></div>
+<div class=\"card\"><h3>y7-serve</h3><p>API server</p><code>y7-serve start</code></div>
+<div class=\"card\"><h3>y7-backup</h3><p>Backup models & config</p><code>y7-backup create</code></div>
+<div class=\"card\"><h3>y7-status</h3><p>Terminal dashboard</p><code>y7-status</code></div>
+<div class=\"card\"><h3>y7-doctor</h3><p>Diagnose & fix</p><code>y7-doctor</code></div>
+</div>
+<h2 class=\"section-title\">Services</h2>
+<div class=\"grid\">
+<div class=\"card\"><h3>Open WebUI</h3><p>Chat UI for LLMs</p><a href=\"http://localhost:3000\">Open →</a></div>
+<div class=\"card\"><h3>Ollama API</h3><code>http://localhost:11434</code></div>
+</div>
+</div>
+<footer>Y7 OS v0.2.0 - MIT - github.com/yahyasaqban-lab/y7os</footer>
+<script>
+async function fetchStatus(){try{
+const r=await fetch('/api/status');const d=await r.json();
+document.getElementById('ram').textContent=d.ram;
+document.getElementById('disk').textContent=d.disk;
+document.getElementById('uptime').textContent=d.uptime;
+const o=document.getElementById('ollama-status');
+o.textContent=d.ollama?'Running':'Stopped';o.className='value '+(d.ollama?'green':'red');
+}catch(e){}}
+setInterval(fetchStatus,5000);fetchStatus();
+</script></body></html>'''
+
+class H(http.server.SimpleHTTPRequestHandler):
+  def do_GET(self):
+    if self.path == '/api/status':
+      self.send_response(200)
+      self.send_header('Content-type','application/json')
+      self.end_headers()
+      s = {'ram':'N/A','disk':'N/A','uptime':'N/A','ollama':False,'version':'0.2.0'}
+      try: s['ram']=subprocess.check_output(\"free -h|awk '/^Mem:/{print \\\$3\\\"/\\\"\\\$2}'\",shell=True).decode().strip()
+      except: pass
+      try: s['disk']=subprocess.check_output(\"df -h /|awk 'NR==2{print \\\$3\\\"/\\\"\\\$2}'\",shell=True).decode().strip()
+      except: pass
+      try: s['uptime']=subprocess.check_output('uptime -p',shell=True).decode().strip().replace('up ','')
+      except: pass
+      try: s['ollama']=subprocess.run(['curl','-s','--max-time','2','http://localhost:11434'],capture_output=True).returncode==0
+      except: pass
+      self.wfile.write(json.dumps(s).encode())
+    else:
+      self.send_response(200)
+      self.send_header('Content-type','text/html;charset=utf-8')
+      self.end_headers()
+      self.wfile.write(HTML.encode())
+  def log_message(self,*a): pass
+
+print(f'[y7-web] Dashboard at http://localhost:{PORT}')
+import socketserver
+socketserver.TCPServer((\"\",PORT),H).serve_forever()" && echo "y7-web stopped" || echo "y7-web: python3 required"

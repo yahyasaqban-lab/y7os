@@ -128,26 +128,43 @@ sudo dd if=y7os-0.3.0-amd64.iso of=/dev/sdX bs=4M status=progress
 ## Features
 
 ### Pre-installed AI Stack
-- **Ollama** — Run LLMs locally (Llama, Mistral, Qwen, Phi)
-- **TinyLlama bundled** — Works offline, no download needed!
-- **Open WebUI** — ChatGPT-like interface at `localhost:3000`
-- **Docker** — Container runtime for AI tools
-- **NVIDIA GPU support** — Auto-detection and easy driver install
-- **y7 Tools** — CLI tools for AI management
+- **Ollama** — Local LLM inference (auto-selected for 8GB+ RAM)
+- **llama.cpp** — Lightweight alternative (auto-selected for 4-8GB)
+- **Open WebUI** — ChatGPT-like interface at localhost:3000
+- **Docker** — For Open WebUI and extensibility
 
 ### Optimized for Low Resources
-- **4GB RAM minimum** — runs on old laptops
-- **ZRAM enabled** — compressed swap for better performance
-- **Auto model selection** — picks the best model for your RAM
+- Auto-detects RAM, CPU, GPU; picks smallest working model
+- ZRAM compression enabled on devices with <8GB RAM
+- Light mode: `--light` flag installs only Ollama + CLI tools
+- Works on 4GB RAM machines, Raspberry Pi, old laptops
 
 ### Privacy First
-- **100% local** — no data leaves your device
-- **No accounts required** — no sign-ups, no tracking
-- **Offline capable** — works without internet after setup
+- Everything runs locally — no data leaves your machine
+- No accounts, no subscriptions, no telemetry
+- All models are open-source quantized variants
 
 ### Arabic + English Native
-- **Full Arabic support** — RTL, locales, keyboard
-- **Bilingual tools** — `y7-ai --lang ar`
+- Auto-detects system language
+- All tools respond bilingually
+- Full Arabic install: `sudo ./y7-install --lang ar`
+
+## CLI Tools (v0.2.0)
+
+| Tool | Description |
+|------|-------------|
+| `y7-ai` | AI chat launcher, auto-picks best model for your RAM |
+| `y7-code` | Code review, generation, translation across 6 languages |
+| `y7-models` | Model manager (list, download, remove, info) |
+| `y7-agents` | Autonomous AI agents for multi-step tasks |
+| `y7-rag` | RAG pipeline (ingest docs, query with context) |
+| `y7-voice` | Voice command interface for the AI |
+| `y7-serve` | REST API server for all Y7 tools |
+| `y7-web` | Web dashboard at localhost:9090 |
+| `y7-backup` | Backup models, configs, and user data |
+| `y7-status` | Real-time terminal dashboard |
+| `y7-doctor` | Diagnose and fix common issues |
+| `y7-update` | Self-update tools from GitHub |
 
 ---
 
