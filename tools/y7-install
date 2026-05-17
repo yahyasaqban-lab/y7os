@@ -15,7 +15,7 @@ set -euo pipefail
 # Configuration & Globals
 ################################################################################
 
-readonly VERSION="0.2.0"
+readonly VERSION="0.3.0"
 readonly SCRIPT_NAME="y7-install"
 readonly LOG_FILE="/var/log/y7-install.log"
 readonly BACKUP_DIR="/opt/y7-backups"
@@ -690,6 +690,74 @@ EOF
                 "تم إنشاء الإعدادات في $Y7_CONFIG_DIR/y7.conf"
 }
 
+install_systemd_services() {
+    msg_title "Installing Systemd Services" "تثبيت خدمات Systemd"
+    
+    # Install y7-web dashboard service
+    if [[ -f "$PWD/etc/systemd/system/y7-web.service" ]]; then
+        cp "$PWD/etc/systemd/system/y7-web.service" /etc/systemd/system/
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable y7-web 2>/dev/null || true
+        msg_success "y7-web dashboard service enabled" "تم تفعيل خدمة y7-web"
+    fi
+    
+    # Install watchdog
+    mkdir -p /opt/y7/scripts /opt/y7/systemd
+    
+    if [[ -f "$PWD/opt/y7/scripts/watchdog.sh" ]]; then
+        cp "$PWD/opt/y7/scripts/watchdog.sh" /opt/y7/scripts/
+        chmod +x /opt/y7/scripts/watchdog.sh
+    fi
+    if [[ -f "$PWD/opt/y7/systemd/y7-watchdog.service" ]]; then
+        cp "$PWD/opt/y7/systemd/y7-watchdog.service" /opt/y7/systemd/
+        cp "$PWD/opt/y7/systemd/y7-watchdog.timer" /opt/y7/systemd/
+        ln -sf /opt/y7/systemd/y7-watchdog.service /etc/systemd/system/
+        ln -sf /opt/y7/systemd/y7-watchdog.timer /etc/systemd/system/
+        systemctl enable y7-watchdog.timer 2>/dev/null || true
+        systemctl start y7-watchdog.timer 2>/dev/null || true
+        msg_success "Watchdog timer installed (checks every 60s)" "تم تثبيت المراقب (فحص كل 60 ثانية)"
+    fi
+    
+    # Install first-boot script
+    if [[ -f "$PWD/opt/y7/scripts/first-boot.sh" ]]; then
+        cp "$PWD/opt/y7/scripts/first-boot.sh" /opt/y7/scripts/
+        chmod +x /opt/y7/scripts/first-boot.sh
+        
+        # Queue first-boot via systemd oneshot
+        cat > /etc/systemd/system/y7-firstboot.service << 'FBEOF'
+[Unit]
+Description=Y7 OS First Boot — Download AI Models
+After=network.target ollama.service
+Wants=ollama.service
+[Service]
+Type=oneshot
+ExecStart=/opt/y7/scripts/first-boot.sh
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+FBEOF
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable y7-firstboot 2>/dev/null || true
+        msg_success "First-boot model download queued" "تمت جدولة تحميل النماذج للتشغيل الأول"
+    fi
+    
+    # Install MOTD
+    if [[ -f "$PWD/etc/profile.d/y7-motd.sh" ]]; then
+        cp "$PWD/etc/profile.d/y7-motd.sh" /etc/profile.d/
+        chmod +x /etc/profile.d/y7-motd.sh
+        msg_success "MOTD installed (status on login)" "تم تثبيت رسالة الترحيب"
+    fi
+    
+    # Install Docker Compose stack
+    if [[ -f "$PWD/docker-compose.yml" ]]; then
+        cp "$PWD/docker-compose.yml" /opt/y7/
+        msg_success "Docker Compose stack ready at /opt/y7/docker-compose.yml" \
+                   "Docker Compose جاهز في /opt/y7/docker-compose.yml"
+    fi
+    
+    log "Systemd services installed"
+}
+
 install_y7_tools() {
     msg_title "=== INSTALLING Y7 TOOLS ===" "=== تثبيت أدوات Y7 ==="
     
@@ -697,6 +765,7 @@ install_y7_tools() {
     install_y7_models_tool
     install_y7_cli
     create_y7_config
+    install_systemd_services
 }
 
 ################################################################################

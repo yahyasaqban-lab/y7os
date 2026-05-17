@@ -1,0 +1,30 @@
+# Y7 OS — AI Stack (Docker Compose)
+# Start: docker compose up -d
+# Stop:  docker compose down
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:latest
+    container_name: y7-open-webui
+    ports:
+      - "3000:8080"
+    network_mode: "host"
+    environment:
+      - OLLAMA_API_BASE_URL=http://127.0.0.1:11434
+    volumes:
+      - open-webui-data:/app/backend/data
+    restart: unless-stopped
+
+  # Uncomment for RAG/vector search:
+  # chroma:
+  #   image: chromadb/chroma:latest
+  #   container_name: y7-chroma
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - chroma-data:/chroma/chroma
+  #   restart: unless-stopped
+
+volumes:
+  open-webui-data:
+  # chroma-data:

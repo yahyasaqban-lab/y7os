@@ -3,7 +3,7 @@
 
 .PHONY: install uninstall test lint clean help setup-hooks
 
-TOOLS = y7-ai y7-models y7-status y7-doctor y7-update y7-code y7-web y7-backup y7-agents y7-rag y7-serve y7-voice
+TOOLS = y7-ai y7-models y7-status y7-doctor y7-update y7-code y7-web y7-backup y7-agents y7-rag y7-serve y7-voice y7-driver
 PREFIX ?= /usr/local/bin
 
 help:

@@ -1,0 +1,11 @@
+[Unit]
+Description=Y7 OS Web Dashboard
+After=network.target ollama.service
+Wants=ollama.service
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/y7-web --port 9090
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
